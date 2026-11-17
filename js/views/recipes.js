@@ -6,7 +6,7 @@ import { FOOD_BY_ID } from '../data/foods.js';
 import { icon, esc, fmt, toast, openSheet, closeSheet, refreshSheet } from '../ui.js';
 import { refresh } from '../main.js';
 
-export const RECIPE_TINTS = { dinner: ['#FBE3DC', '#C94420'], lunch: ['#E3F2EA', '#1F7A52'], smoothie: ['#EEE9FA', '#6D4FC2'], snack: ['#DCE4FA', '#2F5BD8'] };
+export const RECIPE_TINTS = { breakfast: ['#FCEFD3', '#8A5A00'], dinner: ['#FBE3DC', '#C94420'], lunch: ['#E3F2EA', '#1F7A52'], smoothie: ['#EEE9FA', '#6D4FC2'], snack: ['#DCE4FA', '#2F5BD8'] };
 
 export function openRecipeLogSheet(id, { meal, date = D.today() } = {}) {
   const r = RECIPE_BY_ID[id];
@@ -63,15 +63,16 @@ export default {
     const [bg, fg] = RECIPE_TINTS[r.meal] || RECIPE_TINTS.dinner;
     const s = r.perServing;
     return `<main class="screen no-tabs">
-      <div class="row"><a class="round-btn" href="#/eat/recipes" aria-label="Back to recipes">${icon('back', 20)}</a><span class="muted">${r.meal === 'snack' ? 'Prep-ahead snack' : r.meal[0].toUpperCase() + r.meal.slice(1)}</span></div>
+      <div class="row"><a class="round-btn" href="#/eat/recipes" aria-label="Back to recipes">${icon('back', 20)}</a><span class="muted">${r.meal === 'snack' ? (r.mine ? 'Snack' : 'Prep-ahead snack') : r.meal[0].toUpperCase() + r.meal.slice(1)}</span></div>
       <section class="card flush"><div role="img" aria-label="${esc(r.name)}" style="height:120px;background:${bg};display:flex;align-items:center;justify-content:center">${icon('bowl', 40, fg, 1.8)}</div>
         <div style="padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px"><h1 style="font-size:22px;font-weight:800;letter-spacing:-0.01em">${esc(r.name)}</h1>
-        <div class="chips"><span class="pill">${r.minutes} min</span><span class="pill">Makes ${r.servings}</span>${r.tags.includes('crock-pot') ? '<span class="pill">Crock pot</span>' : ''}<span class="pill" style="background:#E3F2EA;color:#1F7A52">No added sugar</span></div>
+        <div class="chips">${r.minutes ? `<span class="pill">${r.minutes} min</span>` : ''}<span class="pill">Makes ${r.servings}</span>${r.tags.includes('crock-pot') ? '<span class="pill">Crock pot</span>' : ''}${r.mine ? '<span class="pill" style="background:#EEE9FA;color:#6D4FC2">Your recipe</span>' : ''}${r.addedSugar ? '' : '<span class="pill" style="background:#E3F2EA;color:#1F7A52">No added sugar</span>'}</div>
         <div class="grid4"><div class="stat-tile"><b>${s.kcal}</b><small>CAL</small></div><div class="stat-tile"><b>${s.p} g</b><small>PROTEIN</small></div><div class="stat-tile"><b>${s.fib} g</b><small>FIBER</small></div><div class="stat-tile"><b>${s.f} g</b><small>FAT</small></div></div>
-        <div class="muted small">Per serving, calculated from USDA values for each ingredient.</div></div></section>
+        <div class="muted small">Per serving, calculated from ${r.mine ? 'the nutrition of each ingredient you added' : 'USDA values for each ingredient'}.</div></div></section>
       <div class="row"><button class="btn grow" data-act="log">${icon('plus', 15, '#fff')}Log a serving</button><button class="btn ghost grow" data-act="plan">${icon('calendar', 15)}Add to plan</button></div>
-      <section class="card"><h2 style="margin-bottom:6px">Ingredients</h2>${r.ingredients.map((i) => `<div class="list-row"><span class="grow" style="font-size:14px;font-weight:600">${esc(i.qty)}</span><span class="meta">${FOOD_BY_ID[i.foodId]?.aisle || ''}</span></div>`).join('')}</section>
-      <section class="card"><h2 style="margin-bottom:8px">Steps</h2><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.5">${r.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></section>
+      <section class="card"><h2 style="margin-bottom:6px">Ingredients</h2>${r.ingredients.map((i) => `<div class="list-row"><span class="grow" style="font-size:14px;font-weight:600">${esc(i.qty)}</span><span class="meta">${esc(i.aisle || FOOD_BY_ID[i.foodId]?.aisle || '')}</span></div>`).join('')}</section>
+      ${r.steps.length ? `<section class="card"><h2 style="margin-bottom:8px">Steps</h2><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.5">${r.steps.map((x) => `<li>${esc(x)}</li>`).join('')}</ol></section>` : ''}
+      <a class="btn line block" href="#/recipe-edit/${r.mine ? r.id : 'copy-' + r.id}">${icon('edit', 15)}${r.mine ? 'Edit recipe' : 'Make it my own (copy and change it)'}</a>
     </main>`;
   },
   actions: {

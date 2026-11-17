@@ -78,23 +78,24 @@ export function openRunSheet({ date = D.today(), type = 'run', item = null, orig
   const st = {
     type: existing?.type || (item?.runType === 'incline-walk' ? 'walk' : type),
     distance: existing?.distanceMi ?? (item?.miles || ''),
-    time: existing ? C.durationStr(existing.minutes) : '',
+    ...splitTime(existing?.minutes),
     incline: existing?.inclinePct ?? (item?.runType === 'incline-walk' ? 8 : ''),
     effort: existing?.effort || (item?.runType === 'intervals' || item?.runType === 'tempo' ? 'hard' : 'easy'),
     kcalOverride: existing?.kcalOverride ?? '',
     note: existing?.note || '',
     date: existing?.date || date,
   };
-  const est = () => C.workoutKcal({ type: st.type, distanceMi: num(st.distance), minutes: C.parseDuration(st.time), inclinePct: num(st.incline) || 0 }, lb);
+  const minutesOf = () => joinTime(st);
+  const est = () => C.workoutKcal({ type: st.type, distanceMi: num(st.distance), minutes: minutesOf(), inclinePct: num(st.incline) || 0 }, lb);
   const read = () => {
     const s = document.querySelector('.sheet');
-    st.distance = s.querySelector('#r-dist').value; st.time = s.querySelector('#r-time').value; st.incline = s.querySelector('#r-inc').value;
+    st.distance = s.querySelector('#r-dist').value; st.th = s.querySelector('#r-h').value; st.tm = s.querySelector('#r-m').value; st.ts = s.querySelector('#r-s').value; st.incline = s.querySelector('#r-inc').value;
     st.kcalOverride = s.querySelector('#r-kcal').value; st.note = s.querySelector('#r-note').value; st.date = s.querySelector('#r-date').value || st.date;
   };
   openSheet({
     label: 'Log a run',
     render: () => {
-      const mins = C.parseDuration(st.time);
+      const mins = minutesOf();
       const pace = C.paceStr(mins, num(st.distance));
       const e = est();
       return `<div class="sheet-hd"><h2>${existing ? 'Edit' : 'Log'} ${st.type === 'walk' ? 'walk' : 'run'}</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
@@ -102,10 +103,14 @@ export function openRunSheet({ date = D.today(), type = 'run', item = null, orig
       <div class="seg" role="tablist"><button class="${st.type === 'run' ? 'on' : ''}" data-act="setType" data-arg="run">Run</button><button class="${st.type === 'walk' ? 'on' : ''}" data-act="setType" data-arg="walk">Walk</button></div>
       <div class="grid2">
         <label class="field"><span>Distance (mi)</span><input id="r-dist" class="input" inputmode="decimal" value="${esc(st.distance)}" placeholder="3.1" data-input="recalc"></label>
-        <label class="field"><span>Time (mm:ss)</span><input id="r-time" class="input" inputmode="numeric" value="${esc(st.time)}" placeholder="31:20" data-input="recalc"></label>
         <label class="field"><span>Incline (%)</span><input id="r-inc" class="input" inputmode="decimal" value="${esc(st.incline)}" placeholder="0" data-input="recalc"></label>
-        <label class="field"><span>Date</span><input id="r-date" class="input" type="date" value="${esc(st.date)}" max="${D.today()}"></label>
       </div>
+      <div class="field"><span id="r-time-l">Time</span><div class="time-in" role="group" aria-labelledby="r-time-l">
+        <label><input id="r-h" class="input" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${esc(st.th)}" placeholder="0" data-input="timeIn" aria-label="Hours"><span>hr</span></label>
+        <label><input id="r-m" class="input" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${esc(st.tm)}" placeholder="31" data-input="timeIn" aria-label="Minutes"><span>min</span></label>
+        <label><input id="r-s" class="input" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${esc(st.ts)}" placeholder="20" data-input="timeIn" aria-label="Seconds"><span>sec</span></label>
+      </div></div>
+      <label class="field"><span>Date</span><input id="r-date" class="input" type="date" value="${esc(st.date)}" max="${D.today()}"></label>
       <div class="field"><span>How did it feel?</span><div class="seg">${['easy', 'moderate', 'hard'].map((x) => `<button class="${st.effort === x ? 'on' : ''}" data-act="effort" data-arg="${x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div></div>
       <div class="card"><div class="row between"><span class="muted">Pace</span><b id="r-pace">${pace || '–'}</b></div>
         <div class="row between" style="margin-top:8px"><span class="muted">Calories burned (estimate)</span><b id="r-est">${e ? fmt(e) : '–'}</b></div>
@@ -118,16 +123,19 @@ export function openRunSheet({ date = D.today(), type = 'run', item = null, orig
       close: () => closeSheet(),
       setType: (el) => { read(); st.type = el.dataset.arg; refreshSheet(); },
       effort: (el) => { read(); st.effort = el.dataset.arg; refreshSheet(); },
-      recalc: () => {
-        read();
-        const s = document.querySelector('.sheet');
-        s.querySelector('#r-pace').textContent = C.paceStr(C.parseDuration(st.time), num(st.distance)) || '–';
-        const e = est(); s.querySelector('#r-est').textContent = e ? fmt(e) : '–';
+      timeIn: (el) => {
+        el.value = el.value.replace(/\D/g, '');
+        // hop forward as she types: 1 digit of hours -> minutes, 2 digits of minutes -> seconds
+        const hop = { 'r-h': [1, 'r-m'], 'r-m': [2, 'r-s'] }[el.id];
+        if (hop && el.value.length >= hop[0] && document.activeElement === el) document.getElementById(hop[1]).select();
+        recalc();
       },
+      recalc: () => recalc(),
       save: async () => {
         read();
-        const minutes = C.parseDuration(st.time); const dist = num(st.distance);
-        if (!(minutes > 0)) { toast('Add your time, like 31:20'); return; }
+        const minutes = minutesOf(); const dist = num(st.distance);
+        if (Number(st.ts) > 59) { toast('Seconds go up to 59'); return; }
+        if (!(minutes > 0)) { toast('Add your time in minutes and seconds'); return; }
         if (st.type === 'run' && !(dist > 0)) { toast('Add the distance in miles'); return; }
         const ko = num(st.kcalOverride);
         const title = st.type === 'walk' ? (num(st.incline) >= 3 ? 'Incline walk' : 'Walk') : (item?.title?.startsWith('Race') ? item.title : item?.title || 'Run');
@@ -137,6 +145,25 @@ export function openRunSheet({ date = D.today(), type = 'run', item = null, orig
       del: async () => { await deleteWorkout(existing); },
     },
   });
+  function recalc() {
+    read();
+    const s = document.querySelector('.sheet');
+    s.querySelector('#r-pace').textContent = C.paceStr(minutesOf(), num(st.distance)) || '–';
+    const e = est(); s.querySelector('#r-est').textContent = e ? fmt(e) : '–';
+  }
+}
+
+/** Minutes as separate hour / minute / second boxes (the iPhone number pad has no colon). */
+export function splitTime(minutes) {
+  if (!(minutes > 0)) return { th: '', tm: '', ts: '' };
+  const total = Math.round(minutes * 60);
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+  return { th: h ? String(h) : '', tm: String(m), ts: sec ? String(sec).padStart(2, '0') : '' };
+}
+export function joinTime({ th, tm, ts }) {
+  const h = Number(th) || 0, m = Number(tm) || 0, sec = Number(ts) || 0;
+  const total = h * 60 + m + sec / 60;
+  return total > 0 ? total : NaN;
 }
 
 async function deleteWorkout(w) {

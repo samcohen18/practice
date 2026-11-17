@@ -4,7 +4,7 @@ import * as D from './dates.js';
 import * as C from './calc.js';
 import * as P from './plan.js';
 import { FOOD_BY_ID, DEFAULT_GO_TOS } from './data/foods.js';
-import { RECIPE_BY_ID } from './data/recipes.js';
+import { RECIPE_BY_ID, RECIPES, build as buildRecipe } from './data/recipes.js';
 import { TEMPLATES, EX_BY_ID, EXERCISES } from './data/exercises.js';
 
 export const MEALS = [
@@ -441,6 +441,36 @@ export function coachNote(date) {
   return `${lead} ${p.item.why}${plus ? ` ${plus.item.kind === 'run' ? `Then ${/^[aeiou]/i.test(plus.item.title) ? 'an' : 'a'} ${plus.item.title.toLowerCase()}${plus.item.miles ? ` (${plus.item.miles} mi)` : ''}` : `${p.item.kind === 'run' ? 'After your run' : 'Then'}: ${plus.item.title.replace(/^Strength: /, '').toLowerCase()}`}.` : ''}${race}`;
 }
 
+// ---------------- her own recipes ----------------
+/** Her recipes live in the database and join the built-in library (search, filters, logging, meal plan, grocery list). */
+export function syncMyRecipes() {
+  for (let i = RECIPES.length - 1; i >= 0; i--) if (RECIPES[i].mine) { delete RECIPE_BY_ID[RECIPES[i].id]; RECIPES.splice(i, 1); }
+  const mine = db.all('myRecipes').filter((r) => r.ingredients?.length && r.servings > 0)
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  for (const r of mine) {
+    try {
+      const built = { ...buildRecipe({ ...r, tags: r.tags || [], steps: r.steps || [], minutes: r.minutes || 0 }), mine: true };
+      RECIPES.unshift(built); RECIPE_BY_ID[built.id] = built;
+    } catch (e) { console.warn('Skipping recipe', r.id, e); }
+  }
+}
+db.onChange((coll) => { if (!coll || coll === 'myRecipes') syncMyRecipes(); });
+export function saveMyRecipe(r) {
+  const id = r.id || 'my-' + db.uid();
+  const clean = {
+    id, name: r.name.trim(), meal: r.meal || 'dinner', servings: Math.max(1, Number(r.servings) || 1), minutes: Math.max(0, Math.round(Number(r.minutes) || 0)),
+    tags: r.tags || [], notes: r.notes || '', copiedFrom: r.copiedFrom || null,
+    steps: (r.steps || []).map((x) => String(x).trim()).filter(Boolean),
+    ingredients: r.ingredients.map((i) => ({ foodId: i.foodId || null, name: i.name, g: Math.round(Number(i.g) * 10) / 10, qty: i.qty, per100: i.per100, aisle: i.aisle || 'Other', addedSugar: !!i.addedSugar })),
+  };
+  return db.put('myRecipes', clean, { replace: true }).then(() => { syncMyRecipes(); return RECIPE_BY_ID[id]; });
+}
+export async function deleteMyRecipe(id) { await db.remove('myRecipes', id); syncMyRecipes(); }
+/** Ingredient snapshot from any food (built-in, hers, or found online). */
+export function ingredientFrom(food, g, qty) {
+  return { foodId: food.id, name: food.name, g, qty: qty || `${Math.round(g)} g ${food.name.toLowerCase()}`, per100: { ...food.per100 }, aisle: food.aisle || 'Other', addedSugar: !!food.addedSugar };
+}
+
 // ---------------- meal plan & grocery ----------------
 export const mealPlan = (wkStart) => db.get('mealPlans', wkStart) || { id: wkStart, days: {} };
 export async function setPlannedDinner(date, recipeId) {
@@ -459,8 +489,8 @@ export function groceryList(wkStart) {
     const r = RECIPE_BY_ID[rid]; if (!r) continue;
     for (const ing of r.ingredients) {
       const f = FOOD_BY_ID[ing.foodId];
-      const key = ing.foodId;
-      if (!items[key]) items[key] = { key, foodId: key, name: groceryName(f), aisle: f?.aisle || 'Other', g: 0, uses: [] };
+      const key = f ? ing.foodId : 'n:' + (ing.name || ing.qty).toLowerCase();
+      if (!items[key]) items[key] = { key, foodId: f ? key : null, name: f ? groceryName(f) : groceryName({ name: ing.name || ing.qty }), aisle: f?.aisle || ing.aisle || 'Other', g: 0, uses: [] };
       items[key].g += ing.g * times;
       items[key].uses.push(r.name);
     }
@@ -473,7 +503,7 @@ export function groceryList(wkStart) {
 function groceryName(f) { return (f?.name || '').replace(/, (raw|dry|cooked|cooked or canned \(drained\))$/i, '').replace(/ \(.*\)$/, ''); }
 export function friendlyQty(foodId, g) {
   const f = FOOD_BY_ID[foodId];
-  const unit = f?.units?.find((u) => /egg|can|block|medium|fillet|tortilla|bottle|bar|lemon|clove/i.test(u.label));
+  const unit = f?.units?.find((u) => /egg|can|block|medium|fillet|tortilla|bottle|bar|lemon|lime|clove|bunch|head|link|pita|bun|jalape|package/i.test(u.label));
   if (unit) {
     const n = Math.max(1, Math.ceil((g / unit.g) * 2) / 2);
     const label = unit.label.replace(/^1 /, '');

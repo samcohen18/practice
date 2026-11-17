@@ -81,6 +81,9 @@ Built-in foods, her own foods, go-tos and recipes work offline. "Search more foo
 - **Edit movements** on any lift: reorder, swap, remove, add (search the library or add her own exercise), and set sets and reps. Save for just that day or for every time that workout comes up. She can undo either.
 - During a workout she can add or remove exercises and sets, and swap to any exercise.
 
+### Recipes
+134 lunches and dinners (plus smoothies and prep-ahead snacks) across Italian, Mexican & Latin, Asian, Indian, Mediterranean and American dishes, with filters for crock pot, sheet pan, soups, salads, vegetarian, seafood, meal prep and under 30 minutes. Every ingredient maps to a USDA food, so calories and macros are computed, and none use added sugar. She can build her own recipes (from the food library, her own foods, or USDA / Open Food Facts online), or tap "Make it my own" on any recipe to copy and change it. Her recipes work everywhere the built-in ones do: search, logging, the dinner plan and the grocery list.
+
 ### Celebrations
 Closing a ring gets a quick banner with sparks. Closing all three gets a full-screen moment: the rings draw in, spin and burst, then fireworks and confetti. Streak milestones (3, 7, 14, 21, 30, 50, 75, 100... days) get a growing flame with embers. Personal bests, a perfect week, hitting the water goal and the first workout get their own moments. Each fires once, only after her own tap (never from a backup sync). The Fuel ring doesn't celebrate if one big meal pushes her more than 10% past the target. There are on/off switches for celebrations and sounds in Settings, and the animations respect the iPhone's Reduce Motion setting. Haptics use the iOS 18 switch trick and work best-effort.
 

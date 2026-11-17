@@ -3,6 +3,7 @@
 // USDA values, so the numbers are real sums, not guesses. None use added sugar unless tagged.
 import { FOOD_BY_ID } from './foods.js';
 import { nutrientsFor, sumNutrients } from '../calc.js';
+import { MORE_RECIPES } from './recipes-more.js';
 
 const I = (foodId, g, qty) => ({ foodId, g, qty });
 
@@ -216,9 +217,10 @@ const RAW = [
   },
 ];
 
-function build(r) {
+/** Works for built-in recipes and hers (her ingredients carry their own per-100 g values, so foods found online still add up offline). */
+export function build(r) {
   const parts = r.ingredients.map((i) => {
-    const f = FOOD_BY_ID[i.foodId];
+    const f = i.per100 ? { per100: i.per100 } : FOOD_BY_ID[i.foodId];
     if (!f) throw new Error(`Recipe ${r.id}: unknown food ${i.foodId}`);
     return nutrientsFor(f, i.g);
   });
@@ -230,20 +232,33 @@ function build(r) {
     f: Math.round(total.f / r.servings),
     fib: Math.round(total.fib / r.servings),
   };
-  const addedSugar = r.ingredients.some((i) => FOOD_BY_ID[i.foodId]?.addedSugar);
+  const addedSugar = r.ingredients.some((i) => (i.per100 ? i.addedSugar : FOOD_BY_ID[i.foodId]?.addedSugar));
   return { ...r, total, perServing: per, addedSugar };
 }
 
-export const RECIPES = RAW.map(build);
+export const RECIPES = [...RAW, ...MORE_RECIPES].map(build);
 export const RECIPE_BY_ID = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
+const isVeg = (r) => r.tags.includes('vegetarian') || (r.tags.includes('tofu') && !r.ingredients.some((i) => ['Meat & seafood'].includes(FOOD_BY_ID[i.foodId]?.aisle) || i.foodId === 'tuna-can'));
 export const RECIPE_FILTERS = [
-  { id: 'dinner', label: 'Dinner', test: (r) => r.meal === 'dinner' },
-  { id: 'lunch', label: 'Lunch', test: (r) => r.meal === 'lunch' },
-  { id: 'high-protein', label: 'High protein', test: (r) => r.perServing.p >= 30 || r.tags.includes('high-protein') && r.perServing.p >= 20 },
-  { id: 'crock-pot', label: 'Crock pot', test: (r) => r.tags.includes('crock-pot') },
-  { id: 'tofu', label: 'Tofu', test: (r) => r.tags.includes('tofu') },
-  { id: 'italian', label: 'Italian', test: (r) => r.tags.includes('italian') },
-  { id: 'quick', label: 'Under 30 min', test: (r) => r.minutes < 30 },
-  { id: 'smoothie', label: 'Smoothies', test: (r) => r.meal === 'smoothie' },
-  { id: 'prep-ahead', label: 'Prep-ahead snacks', test: (r) => r.meal === 'snack' },
+  { id: 'mine', group: 'style', label: 'My recipes', test: (r) => !!r.mine },
+  { id: 'dinner', group: 'style', label: 'Dinner', test: (r) => r.meal === 'dinner' },
+  { id: 'lunch', group: 'style', label: 'Lunch', test: (r) => r.meal === 'lunch' },
+  { id: 'high-protein', group: 'style', label: 'High protein', test: (r) => r.perServing.p >= 30 || r.tags.includes('high-protein') && r.perServing.p >= 20 },
+  { id: 'quick', group: 'style', label: 'Under 30 min', test: (r) => r.minutes < 30 },
+  { id: 'crock-pot', group: 'style', label: 'Crock pot', test: (r) => r.tags.includes('crock-pot') },
+  { id: 'sheet-pan', group: 'style', label: 'Sheet pan', test: (r) => r.tags.includes('sheet-pan') },
+  { id: 'prep', group: 'style', label: 'Meal prep', test: (r) => r.tags.includes('prep-ahead') && r.meal !== 'snack' },
+  { id: 'soup', group: 'style', label: 'Soups & stews', test: (r) => r.tags.includes('soup') },
+  { id: 'salad', group: 'style', label: 'Salads', test: (r) => r.tags.includes('salad') },
+  { id: 'vegetarian', group: 'style', label: 'Vegetarian', test: isVeg },
+  { id: 'tofu', group: 'style', label: 'Tofu', test: (r) => r.tags.includes('tofu') },
+  { id: 'seafood', group: 'style', label: 'Seafood', test: (r) => r.tags.includes('seafood') || r.ingredients.some((i) => /salmon|shrimp|cod|tuna|tilapia/.test(i.foodId || '')) },
+  { id: 'smoothie', group: 'style', label: 'Smoothies', test: (r) => r.meal === 'smoothie' },
+  { id: 'prep-ahead', group: 'style', label: 'Prep-ahead snacks', test: (r) => r.meal === 'snack' },
+  { id: 'italian', group: 'cuisine', label: 'Italian', test: (r) => r.tags.includes('italian') },
+  { id: 'mexican', group: 'cuisine', label: 'Mexican & Latin', test: (r) => r.tags.includes('mexican') || r.tags.includes('caribbean') },
+  { id: 'asian', group: 'cuisine', label: 'Asian', test: (r) => r.tags.includes('asian') },
+  { id: 'indian', group: 'cuisine', label: 'Indian', test: (r) => r.tags.includes('indian') },
+  { id: 'mediterranean', group: 'cuisine', label: 'Mediterranean', test: (r) => r.tags.includes('mediterranean') },
+  { id: 'american', group: 'cuisine', label: 'American & Southern', test: (r) => r.tags.includes('american') || r.tags.includes('southern') },
 ];

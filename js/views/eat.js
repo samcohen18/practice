@@ -67,11 +67,12 @@ function entryMeta(e) {
 function recipesTab() {
   const qn = recipeQ.trim().toLowerCase();
   const list = RECIPES.filter((r) => [...filters].every((f) => RECIPE_FILTERS.find((x) => x.id === f).test(r)) && (!qn || r.name.toLowerCase().includes(qn) || r.ingredients.some((i) => i.qty.toLowerCase().includes(qn))));
-  const tile = (r) => { const [bg, fg] = RECIPE_TINTS[r.meal] || RECIPE_TINTS.dinner; return `<a class="card flush recipe-tile" href="#/recipe/${r.id}"><div class="img" style="background:${bg}">${icon('bowl', 26, fg)}</div>
-    <div class="body"><div style="font-size:14px;font-weight:800;line-height:1.3">${esc(r.name)}</div><div class="muted small">${r.minutes} min · ${r.perServing.kcal} cal</div><div class="small" style="font-weight:700;color:#8A5A00">${r.perServing.p} g protein</div></div></a>`; };
-  return `<label class="search">${icon('search', 18, '#5B6475')}<input type="search" aria-label="Search recipes" placeholder="Search recipes or ingredients" value="${esc(recipeQ)}" data-input="rq"></label>
-    <div class="chips">${RECIPE_FILTERS.map((f) => `<button class="chip ${filters.has(f.id) ? 'on' : ''}" data-act="filter" data-f="${f.id}" aria-pressed="${filters.has(f.id)}">${filters.has(f.id) ? icon('check', 13, '#fff', 2.6) : ''}${f.label}</button>`).join('')}</div>
-    <div id="recipe-grid">${list.length ? `<div class="grid2">${list.map(tile).join('')}</div>` : '<div class="card muted">No recipes match. Try removing a filter.</div>'}</div>
+  const tile = (r) => { const [bg, fg] = RECIPE_TINTS[r.meal] || RECIPE_TINTS.dinner; return `<a class="card flush recipe-tile" href="#/recipe/${r.id}"><div class="img" style="background:${bg}">${icon('bowl', 26, fg)}${r.mine ? '<span class="mine-tag">Yours</span>' : ''}</div>
+    <div class="body"><div style="font-size:14px;font-weight:800;line-height:1.3">${esc(r.name)}</div><div class="muted small">${r.minutes ? `${r.minutes} min · ` : ''}${r.perServing.kcal} cal</div><div class="small" style="font-weight:700;color:#8A5A00">${r.perServing.p} g protein</div></div></a>`; };
+  return `<div class="row" style="gap:10px"><label class="search grow" style="margin:0">${icon('search', 18, '#5B6475')}<input type="search" aria-label="Search recipes" placeholder="Search recipes or ingredients" value="${esc(recipeQ)}" data-input="rq"></label>
+    <a class="btn" href="#/recipe-edit/new" style="flex:none;height:46px;padding:0 14px">${icon('plus', 15, '#fff')}New</a></div>
+    ${['style', 'cuisine'].map((g) => `<div class="chips scroll-x" role="group" aria-label="${g === 'style' ? 'Meal and style' : 'Cuisine'}">${RECIPE_FILTERS.filter((f) => f.group === g && (f.id !== 'mine' || RECIPES.some((r) => r.mine))).map((f) => `<button class="chip ${filters.has(f.id) ? 'on' : ''}" data-act="filter" data-f="${f.id}" aria-pressed="${filters.has(f.id)}">${filters.has(f.id) ? icon('check', 13, '#fff', 2.6) : ''}${f.label}</button>`).join('')}</div>`).join('')}
+    <div id="recipe-grid"><div class="row between" style="margin:2px 2px 8px"><span class="muted small" id="recipe-count">${list.length} recipe${list.length === 1 ? '' : 's'}</span>${filters.size ? '<button class="link-btn" data-act="clearFilters">Clear filters</button>' : ''}</div>${list.length ? `<div class="grid2">${list.map(tile).join('')}</div>` : '<div class="card muted">No recipes match. Try removing a filter.</div>'}</div>
     <a class="card navy row" href="#/eat/plan"><div class="grow"><div style="font-size:15px;font-weight:800">This week's dinners</div><div class="small" style="color:#C9D0DD;font-weight:600">${Object.keys(store.mealPlan(D.weekStart(D.today())).days).length} planned · grocery list</div></div><span class="btn soft small" style="background:#fff">Open</span></a>`;
 }
 
@@ -136,20 +137,29 @@ export default {
     filter: (el) => {
       const f = el.dataset.f;
       if (filters.has(f)) filters.delete(f);
-      else { if (['dinner', 'lunch', 'smoothie', 'prep-ahead'].includes(f)) ['dinner', 'lunch', 'smoothie', 'prep-ahead'].forEach((x) => filters.delete(x)); filters.add(f); }
+      else {
+        const exclusive = (set) => { if (set.includes(f)) set.forEach((x) => filters.delete(x)); };
+        exclusive(['dinner', 'lunch', 'smoothie', 'prep-ahead']);
+        exclusive(RECIPE_FILTERS.filter((x) => x.group === 'cuisine').map((x) => x.id));
+        filters.add(f);
+      }
       refresh();
     },
+    clearFilters: () => { filters.clear(); refresh(); },
     pw: (el) => { planWeek = D.addDays(planWeek || D.weekStart(D.today()), Number(el.dataset.d)); refresh(); },
     unplan: async (el) => { await store.setPlannedDinner(el.dataset.d, null); refresh(); },
     pickDinner: (el) => {
       const d = el.dataset.d;
-      const opts = RECIPES.filter((r) => r.meal === 'dinner' || r.meal === 'lunch');
+      const all = RECIPES.filter((r) => r.meal === 'dinner' || r.meal === 'lunch');
+      let pq = '';
+      const listHtml = () => { const q2 = pq.trim().toLowerCase(); const opts = all.filter((r) => !q2 || r.name.toLowerCase().includes(q2) || r.tags.some((t) => t.includes(q2))); return opts.length ? opts.map((r) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="choose" data-id="${r.id}">
+            <span class="grow"><span class="name" style="display:block">${esc(r.name)}</span><span class="meta">${r.mine ? 'Yours · ' : ''}${r.minutes ? `${r.minutes} min · ` : ''}${r.perServing.kcal} cal · ${r.perServing.p} g protein${r.tags.includes('crock-pot') ? ' · crock pot' : ''}</span></span>${icon('plus', 16)}</button>`).join('') : '<p class="note" style="padding:10px 0">No match.</p>'; };
       openSheet({
         label: 'Pick a dinner',
         render: () => `<div class="sheet-hd"><h2>${D.DOW_LONG[D.dowIndex(d)]} dinner</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
-          <div class="card" style="padding:4px 16px">${opts.map((r) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="choose" data-id="${r.id}">
-            <span class="grow"><span class="name" style="display:block">${esc(r.name)}</span><span class="meta">${r.minutes} min · ${r.perServing.kcal} cal · ${r.perServing.p} g protein${r.tags.includes('crock-pot') ? ' · crock pot' : ''}</span></span>${icon('plus', 16)}</button>`).join('')}</div>`,
-        actions: { close: () => closeSheet(), choose: async (b) => { await store.setPlannedDinner(d, b.dataset.id); closeSheet(true); refresh(); } },
+          <label class="search">${icon('search', 18, '#5B6475')}<input type="search" aria-label="Search dinners" placeholder="Search: tacos, curry, salmon…" data-input="pq" autocomplete="off"></label>
+          <div class="card" style="padding:4px 16px" id="pick-list">${listHtml()}</div>`,
+        actions: { close: () => closeSheet(), pq: (el) => { pq = el.value; document.getElementById('pick-list').innerHTML = listHtml(); }, choose: async (b) => { await store.setPlannedDinner(d, b.dataset.id); closeSheet(true); refresh(); } },
       });
     },
     gtoggle: async (el) => { await store.toggleGrocery(planWeek || D.weekStart(D.today()), el.dataset.k); refresh(); },

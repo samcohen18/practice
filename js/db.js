@@ -7,7 +7,7 @@ const STORE = 'records';
 const META = 'meta';
 
 export const COLLECTIONS = ['settings', 'foodLog', 'customFoods', 'goTos', 'workouts', 'planEdits',
-  'weights', 'energy', 'water', 'mealPlans', 'grocery', 'session', 'planAdds', 'myTemplates', 'customExercises'];
+  'weights', 'energy', 'water', 'mealPlans', 'grocery', 'session', 'planAdds', 'myTemplates', 'customExercises', 'myRecipes'];
 
 let idb = null;
 const cache = new Map(); // key -> record

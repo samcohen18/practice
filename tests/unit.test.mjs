@@ -103,7 +103,7 @@ test('foods: valid data and energy roughly matches macros (Atwater)', () => {
     const n = f.per100;
     for (const k of ['kcal', 'p', 'c', 'f', 'fib']) assert.ok(Number.isFinite(n[k]) && n[k] >= 0, `${f.id}.${k}`);
     assert.ok(f.sizes.small > 0 && f.sizes.regular > 0 && f.sizes.large >= f.sizes.regular, `${f.id} sizes`);
-    if (f.drink || f.id === 'curry-paste' || n.kcal < 30) continue; // alcohol, spice blends and very low-energy foods (organic acids) // alcohol / tiny-dose foods
+    if (f.drink || f.acids || f.id === 'curry-paste' || n.kcal < 30) continue; // alcohol, spice blends and very low-energy foods (organic acids) // alcohol / tiny-dose foods
     const atwater = 4 * n.p + 4 * (n.c - n.fib) + 2 * n.fib + 9 * n.f; // fiber ~2 kcal/g
     const err = Math.abs(atwater - n.kcal) / Math.max(n.kcal, 20);
     assert.ok(err < 0.2, `${f.id}: label ${n.kcal} vs atwater ${atwater.toFixed(0)}`);
@@ -112,13 +112,16 @@ test('foods: valid data and energy roughly matches macros (Atwater)', () => {
 });
 
 test('recipes: computed macros are realistic', () => {
-  assert.ok(RECIPES.length >= 20);
+  assert.ok(RECIPES.length >= 130, `only ${RECIPES.length} recipes`);
+  const ids = new Set(); for (const r of RECIPES) { assert.ok(!ids.has(r.id), `duplicate recipe ${r.id}`); ids.add(r.id); }
+  for (const cuisine of ['italian', 'mexican', 'asian', 'indian', 'mediterranean', 'american']) assert.ok(RECIPES.filter((r) => r.tags.includes(cuisine)).length >= 8, `few ${cuisine}`);
   for (const r of RECIPES) {
     const s = r.perServing;
     assert.ok(s.kcal > 40 && s.kcal < 900, `${r.id} kcal ${s.kcal}`);
     assert.ok(r.steps.length >= 1 && r.ingredients.length >= 2);
     if (['dinner', 'lunch'].includes(r.meal)) assert.ok(s.p >= 15, `${r.id} protein ${s.p}`);
     assert.equal(r.addedSugar, false, `${r.id} should have no added sugar`);
+    for (const i of r.ingredients) assert.ok(i.g > 0 && i.qty, `${r.id} ingredient ${i.foodId}`);
   }
 });
 

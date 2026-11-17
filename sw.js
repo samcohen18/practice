@@ -1,13 +1,13 @@
 // Offline support: cache the app shell so it opens with no signal (the gym!).
 // Bump VERSION whenever you deploy changes so phones pick up the new files.
-const VERSION = 'practice-v3';
+const VERSION = 'practice-v5';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/main.js', './js/db.js', './js/dates.js', './js/calc.js', './js/plan.js', './js/store.js', './js/ui.js', './js/sync.js', './js/config.js', './js/foodsearch.js', './js/celebrate.js', './js/rewards.js',
-  './js/data/foods.js', './js/data/recipes.js', './js/data/exercises.js', './js/data/daily.js',
+  './js/data/foods.js', './js/data/recipes.js', './js/data/recipes-more.js', './js/data/exercises.js', './js/data/daily.js',
   './js/views/today.js', './js/views/train.js', './js/views/workout.js', './js/views/change.js', './js/views/eat.js', './js/views/addfood.js',
   './js/views/portion.js', './js/views/recipes.js', './js/views/progress.js', './js/views/settings.js', './js/views/onboarding.js', './js/views/quicklog.js',
-  './js/views/day.js', './js/views/lift.js', './js/views/expicker.js',
+  './js/views/day.js', './js/views/lift.js', './js/views/expicker.js', './js/views/recipeedit.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];
 

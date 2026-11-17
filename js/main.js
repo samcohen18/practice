@@ -15,6 +15,7 @@ import settings from './views/settings.js';
 import onboarding from './views/onboarding.js';
 import day from './views/day.js';
 import lift from './views/lift.js';
+import recipeedit from './views/recipeedit.js';
 import { openQuickLog } from './views/quicklog.js';
 import * as fx from './celebrate.js';
 import * as rewards from './rewards.js';
@@ -24,6 +25,7 @@ const ROUTES = [
   [/^#\/train(?:\/(\w+))?$/, train],
   [/^#\/workout$/, workout],
   [/^#\/change\/(\d{4}-\d{2}-\d{2})$/, change],
+  [/^#\/recipe-edit\/([\w-]+)$/, recipeedit],
   [/^#\/day\/(\d{4}-\d{2}-\d{2})$/, day],
   [/^#\/lift\/([pcm]:[\w-]+)$/, lift],
   [/^#\/eat(?:\/(today|recipes|plan))?$/, eat],
@@ -78,6 +80,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 async function boot() {
   await db.init();
+  store.syncMyRecipes();
   await sync.init({ onPulled: () => refresh() });
   render();
   rewards.initRewards();
