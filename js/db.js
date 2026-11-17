@@ -7,7 +7,7 @@ const STORE = 'records';
 const META = 'meta';
 
 export const COLLECTIONS = ['settings', 'foodLog', 'customFoods', 'goTos', 'workouts', 'planEdits',
-  'weights', 'energy', 'water', 'mealPlans', 'grocery', 'session'];
+  'weights', 'energy', 'water', 'mealPlans', 'grocery', 'session', 'planAdds', 'myTemplates', 'customExercises'];
 
 let idb = null;
 const cache = new Map(); // key -> record
@@ -90,11 +90,11 @@ export function get(coll, id) {
 export function where(coll, pred) { return all(coll).filter(pred); }
 
 /** Insert or update. Returns the stored record. */
-export async function put(coll, rec, { fromSync = false } = {}) {
+export async function put(coll, rec, { fromSync = false, replace = false } = {}) {
   const id = rec.id || uid();
   const prev = cache.get(keyOf(coll, id));
   const stored = {
-    ...(prev && !prev.deleted ? prev : {}),
+    ...(prev && !prev.deleted && !replace ? prev : {}),
     ...rec,
     id, coll, key: keyOf(coll, id),
     updatedAt: fromSync ? rec.updatedAt : new Date().toISOString(),
@@ -149,10 +149,10 @@ export async function markClean(keys) {
   await txPut(STORE, vals);
 }
 /** Apply a record from the server if it is newer than ours (last write wins). */
-export async function applyRemote(r) {
+export async function applyRemote(r, { force = false } = {}) {
   const key = keyOf(r.coll, r.id);
   const mine = cache.get(key);
-  if (mine && mine.updatedAt >= r.updatedAt) return false;
+  if (!force && mine && mine.updatedAt >= r.updatedAt) return false;
   const s = { ...r, key, dirty: false };
   cache.set(key, s);
   await txPut(STORE, [s]);

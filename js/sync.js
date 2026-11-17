@@ -77,6 +77,8 @@ async function accessToken() {
 export async function signOut() {
   try { await api('/auth/v1/logout', { method: 'POST' }); } catch { /* ignore */ }
   await db.setMeta('session', null);
+  await db.setMeta('lastSync', null);
+  await db.setMeta('pullCursor', null);
   status.state = 'off';
 }
 
@@ -100,13 +102,16 @@ export async function syncNow() {
     const userId = session().user.id;
     // 1) pull anything newer from the server
     let cursor = db.meta('pullCursor') || '1970-01-01T00:00:00Z';
+    // First sync on this device: the backup wins, so setting up a new phone (which creates
+    // fresh settings during the welcome screens) never overwrites her real data.
+    const firstSync = !db.meta('lastSync');
     let pulled = 0;
     for (let page = 0; page < 50; page++) {
       const rows = await api(`/rest/v1/records?select=id,coll,data,updated_at,deleted,synced_at&synced_at=gt.${encodeURIComponent(cursor)}&order=synced_at.asc&limit=500`);
       if (!rows?.length) break;
       for (const row of rows) {
         const rec = { ...row.data, coll: row.coll, updatedAt: row.updated_at, deleted: !!row.deleted };
-        if (await db.applyRemote(rec)) pulled++;
+        if (await db.applyRemote(rec, { force: firstSync })) pulled++;
         cursor = row.synced_at;
       }
       await db.setMeta('pullCursor', cursor);

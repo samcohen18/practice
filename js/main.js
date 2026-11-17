@@ -13,13 +13,19 @@ import recipes from './views/recipes.js';
 import progress from './views/progress.js';
 import settings from './views/settings.js';
 import onboarding from './views/onboarding.js';
+import day from './views/day.js';
+import lift from './views/lift.js';
 import { openQuickLog } from './views/quicklog.js';
+import * as fx from './celebrate.js';
+import * as rewards from './rewards.js';
 
 const ROUTES = [
   [/^#?\/?$/, today], [/^#\/today$/, today],
   [/^#\/train(?:\/(\w+))?$/, train],
   [/^#\/workout$/, workout],
   [/^#\/change\/(\d{4}-\d{2}-\d{2})$/, change],
+  [/^#\/day\/(\d{4}-\d{2}-\d{2})$/, day],
+  [/^#\/lift\/([pcm]:[\w-]+)$/, lift],
   [/^#\/eat(?:\/(today|recipes|plan))?$/, eat],
   [/^#\/add\/(\w+)(?:\/(\d{4}-\d{2}-\d{2}))?$/, addFood],
   [/^#\/recipe\/([\w-]+)$/, recipes],
@@ -74,6 +80,7 @@ async function boot() {
   await db.init();
   await sync.init({ onPulled: () => refresh() });
   render();
+  rewards.initRewards();
   sync.syncSoon();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -84,6 +91,6 @@ async function boot() {
 }
 
 // Test hooks (harmless in production).
-window.__practice = { db, store, D, go, refresh, setNow: (iso) => { D.setNow(iso); store.clearCaches(); refresh(); } };
+window.__practice = { db, store, D, go, refresh, fx, rewards, setNow: (iso) => { D.setNow(iso); store.clearCaches(); refresh(); } };
 
 boot();

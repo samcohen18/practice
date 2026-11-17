@@ -1,3 +1,4 @@
+import * as fx from '../celebrate.js';
 import * as store from '../store.js';
 import * as C from '../calc.js';
 import * as D from '../dates.js';
@@ -67,6 +68,10 @@ export default {
         <p class="note" style="padding:6px 0 10px">Save any meal as a go-to from the Eat tab.</p></section>
       ${customs.length ? `<section class="card" style="padding-bottom:6px"><h2 style="margin-bottom:6px">Your foods</h2>${customs.map((c) => `<div class="list-row"><span class="grow"><span class="name" style="display:block">${esc(c.name)}</span><span class="meta">${c.per100.kcal} cal per 100 g</span></span><button class="circle-btn" data-act="delFood" data-id="${c.id}" aria-label="Delete ${esc(c.name)}">${icon('trash', 15)}</button></div>`).join('')}</section>` : ''}
 
+      <section class="card" style="display:flex;flex-direction:column;gap:12px"><h2>Celebrations</h2>
+        <label class="toggle-row"><span><b style="display:block;font-size:15px">Celebrations</b><span class="muted">Animations when you close rings, hit streaks and set new bests</span></span><input type="checkbox" class="switch" id="s-fx" ${fx.enabled() ? 'checked' : ''} data-change="fxOn"></label>
+        <label class="toggle-row"><span><b style="display:block;font-size:15px">Celebration sounds</b><span class="muted">A soft chime when you close a ring or hit a milestone</span></span><input type="checkbox" class="switch" id="s-sounds" ${fx.soundsOn() ? 'checked' : ''} data-change="sounds"></label>
+        <button class="btn line" data-act="previewFx">Preview the all-rings celebration</button></section>
       <section class="card" style="display:flex;flex-direction:column;gap:12px"><h2>Backup & sync</h2>
         ${!cfg.configured ? `<p class="note">Cloud backup isn't connected yet. Your data is saved on this phone. Use “Download backup” now and then to keep a copy.</p>`
           : st.email ? `<div class="row between"><span><b style="display:block">Signed in</b><span class="muted">${esc(st.email)}</span></span><span class="pill" style="background:${st.state === 'error' ? '#FBE3DC' : '#E3F2EA'};color:${st.state === 'error' ? '#C94420' : '#1F7A52'}">${icon('cloud', 13)}${st.state === 'syncing' ? 'Syncing…' : st.state === 'error' ? 'Sync error' : 'Backed up'}</span></div>
@@ -95,6 +100,9 @@ export default {
     </main>`;
   },
   actions: {
+    fxOn: (el) => { fx.setEnabled(el.checked); },
+    sounds: (el) => { fx.setSounds(el.checked); if (el.checked) fx.chime(false); },
+    previewFx: () => { const was = fx.enabled(); fx.setEnabled(true); fx.enqueue(() => fx.allRings()); fx.setEnabled(was); },
     saveTargets: async () => {
       const base = num(document.querySelector('#s-base').value);
       if (!(base >= 1000 && base <= 4000)) { toast('Base calories should be between 1,000 and 4,000'); return; }

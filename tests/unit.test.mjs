@@ -267,3 +267,102 @@ test('dates helpers', () => {
   assert.equal(D.fmtLong('2026-11-19'), 'Thursday, Nov 19');
   assert.equal(D.daysInMonth('2026-02-10'), 28);
 });
+
+// ---------------- run + lift days ----------------
+const planS = (doubleDays, extra = {}) => ({ createdOn: '2026-11-16', plan: { ...P.DEFAULT_PLAN_SETTINGS, start: '2026-11-16', startMiles: 12, doubleDays, ...extra } });
+
+test('run + lift days add a lift to a run day and an easy run to a lift day', () => {
+  const w = P.baseWeek(planS([false, true, false, true, false, false, false]), '2026-11-16', new Set());
+  const tue = w.days[1], thu = w.days[3];
+  assert.equal(tue.item.kind, 'run');
+  assert.ok(tue.double && tue.double.item.kind !== 'run', 'Tuesday run gets a lift');
+  assert.ok(thu.item.kind !== 'run' && thu.double?.item.kind === 'run', 'Thursday lift gets a run');
+  assert.ok(w.days.filter((d) => d.double).length === 2);
+});
+
+test('weekly miles stay the same when an easy run is added on a double day', () => {
+  const plain = P.baseWeek(planS(Array(7).fill(false)), '2026-11-16', new Set());
+  const dbl = P.baseWeek(planS([false, false, false, true, false, false, false]), '2026-11-16', new Set());
+  const miles = (w) => w.days.reduce((s, d) => s + (d.item.miles || 0) + (d.double?.item.miles || 0), 0);
+  assert.ok(Math.abs(miles(plain) - miles(dbl)) <= 1, `${miles(plain)} vs ${miles(dbl)}`);
+});
+
+test('no heavy legs paired on the long-run day, the day before, or beside another leg day', () => {
+  for (let d = 0; d < 7; d++) {
+    const dd = Array(7).fill(false); dd[d] = true;
+    for (const longRunDay of [5, 6, 0]) {
+      const w = P.baseWeek(planS(dd, { longRunDay }), '2026-11-16', new Set());
+      const legs = new Set(['lower-hips', 'full-body']);
+      w.days.forEach((day, i) => {
+        if (!day.double || !legs.has(day.double.slot)) return;
+        assert.ok(day.slot !== 'long' && w.days[i + 1]?.slot !== 'long', `legs near long run on ${i}`);
+        assert.ok(!legs.has(w.days[i - 1]?.slot) && !legs.has(w.days[i + 1]?.slot), `legs beside leg day on ${i}`);
+      });
+    }
+  }
+});
+
+test('double days on unavailable days are ignored', () => {
+  const avail = [true, false, true, false, true, false, true];
+  const w = P.baseWeek(planS([false, true, false, true, false, false, false], { availableDays: avail, longRunDay: 6 }), '2026-11-16', new Set());
+  assert.ok(!w.days[1].double && !w.days[3].double);
+});
+
+test('day-only movement changes apply to the planned lift', () => {
+  const w = P.baseWeek(planS(Array(7).fill(false)), '2026-11-16', new Set());
+  const lift = w.days.find((d) => d.item.templateId);
+  const days = P.applyEdits(w, [{ id: lift.date, custom: [{ exId: 'plank', sets: 2, target: 30 }] }]);
+  const got = days.find((d) => d.date === lift.date);
+  assert.deepEqual(got.item.exercises, [{ exId: 'plank', sets: 2, target: 30 }]);
+  assert.equal(got.item.templateId, lift.item.templateId);
+});
+
+// ---------------- celebrations ----------------
+import { decide, isMilestone } from '../js/rewards.js';
+const snap = (o) => ({ date: '2026-11-17', wk: '2026-11-16', restRing: false, train: false, fuel: false, fuelOk: true, proteinDone: false, water: false, streak: 1, perfectWeek: false, weekSessions: 6, workouts: 3, mins: 0, trainMin: 60, protein: 0, ...o });
+
+test('closing one ring celebrates that ring once', () => {
+  const a = decide(null, snap({}));
+  assert.equal(a.show.length, 0);
+  const b = decide(a.next, snap({ proteinDone: true }));
+  assert.deepEqual(b.show.map((x) => x.ring), ['protein']);
+  assert.equal(decide(b.next, snap({ proteinDone: true })).show.length, 0);
+});
+
+test('closing the last ring shows the all-rings celebration instead', () => {
+  const a = decide(null, snap({ train: true, proteinDone: true }));
+  const b = decide(a.next, snap({ train: true, proteinDone: true, fuel: true }));
+  assert.deepEqual(b.show.map((x) => x.kind), ['allRings']);
+  assert.equal(decide(b.next, snap({ train: true, proteinDone: true, fuel: true })).show.length, 0, 'only once a day');
+});
+
+test('fuel ring does not celebrate when a big meal blows past the target', () => {
+  const a = decide(null, snap({}));
+  const b = decide(a.next, snap({ fuel: true, fuelOk: false }));
+  assert.equal(b.show.length, 0);
+});
+
+test('rest-day train ring counts toward all rings but is not celebrated by itself', () => {
+  const a = decide(null, snap({ restRing: true, train: true }));
+  assert.equal(a.show.length, 0);
+});
+
+test('streak milestones fire once per streak, and again for a new streak', () => {
+  assert.ok(isMilestone(7) && isMilestone(30) && !isMilestone(8) && isMilestone(500));
+  let st = decide(null, snap({ streak: 6, date: '2026-11-16' })).next;
+  const r = decide(st, snap({ streak: 7 }));
+  assert.deepEqual(r.show.map((x) => x.kind), ['streak']);
+  assert.equal(decide(r.next, snap({ streak: 7 })).show.length, 0);
+  // streak broke, later a new 7-day run ends on a different day -> celebrates again
+  const later = decide({ ...r.next, streak: 6, date: '2026-12-09' }, snap({ streak: 7, date: '2026-12-10' }));
+  assert.ok(later.show.some((x) => x.kind === 'streak'));
+});
+
+test('perfect week and first workout', () => {
+  const a = decide(null, snap({ workouts: 0 }));
+  const b = decide(a.next, snap({ workouts: 1 }));
+  assert.ok(b.show.some((x) => x.kind === 'firstWorkout'));
+  const c = decide(b.next, snap({ perfectWeek: true }));
+  assert.ok(c.show.some((x) => x.kind === 'perfectWeek'));
+  assert.ok(!decide(c.next, snap({ perfectWeek: true })).show.some((x) => x.kind === 'perfectWeek'));
+});

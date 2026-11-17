@@ -5,6 +5,7 @@ import { RACE_DISTANCES, satisfies as P_satisfies } from '../plan.js';
 import { icon, esc, fmt, typeColor, toast, num } from '../ui.js';
 import { refresh, go } from '../main.js';
 import { openRunSheet, startTemplate, openWorkoutPicker, openEditWorkout } from './quicklog.js';
+import { startRef } from './day.js';
 
 let viewWeek = null; // week being viewed on "This week"
 let draft = null;    // My week form draft
@@ -45,25 +46,32 @@ function dayRow(d, today) {
     sub = esc([w.distanceMi ? `${w.distanceMi} mi` : '', `${fmt(w.minutes)} min`, w.distanceMi ? C.paceStr(w.minutes, w.distanceMi) : '', `${fmt(C.creditedKcal(w))} cal`].filter(Boolean).join(' · '));
     right = `<button class="check-dot" data-act="editW" data-id="${w.id}" aria-label="Done. Edit ${esc(w.title)}">${icon('check', 16, '#fff', 2.6)}</button>`;
   } else if (d.state === 'today') {
-    right = `<button class="btn coral small" data-act="start" data-date="${d.date}">Start</button>`;
+    right = `<button class="btn coral small" data-act="startRef" data-ref="${d.sessions[0].ref}">Start</button>`;
   } else if (d.state === 'upcoming') {
-    right = `<a class="btn line small" href="#/change/${d.origDate}">Change</a>`;
+    right = `<button class="btn line small" data-act="changeDay" data-orig="${d.origDate}">Change</button>`;
   } else if (d.state === 'skipped') {
-    right = `<a class="btn line small" href="#/change/${d.origDate}">Undo</a>`;
+    right = `<button class="btn line small" data-act="changeDay" data-orig="${d.origDate}">Undo</button>`;
   } else if (d.state === 'missed') {
     right = `<button class="btn line small" data-act="logMissed" data-date="${d.date}">Log it</button>`;
   }
-  const title = it.kind === 'rest' && d.extra ? `Rest day + ${esc(d.workouts[0].title)}` : esc(it.title);
-  return `<div class="day-row ${d.date === today && d.state !== 'done' ? 'today' : ''}" data-day="${d.date}">${dn}${dot}
-    <div class="grow"><div style="font-size:15px;font-weight:700" class="${d.state === 'skipped' ? 'strike' : ''}">${title}</div><div class="muted small">${sub}${d.state === 'missed' ? ' · missed' : ''}</div></div>${right}</div>`;
+  const pendingExtra = d.extras.find((x) => !x.workout);
+  if (d.date === today && pendingExtra && (d.state === 'done' || d.state === 'rest' || d.state === 'skipped')) right = `<button class="btn coral small" data-act="startRef" data-ref="${pendingExtra.ref}">Start</button>`;
+  const loggedOnRest = it.kind === 'rest' && d.extra && !d.extras.length;
+  const title = loggedOnRest ? `Rest day + ${esc(d.workouts[0].title)}` : esc(it.title);
+  const short = (it) => it.kind === 'run' ? `${it.title}${it.miles ? ` · ${it.miles} mi` : ''}` : it.title.replace(/^Strength: /, 'Lift: ');
+  const extras = d.extras.map((x) => { const c = itemColor(x.item); return `<div class="extra-line"><span class="pill" style="background:${c.t};color:${c.c};padding:3px 9px;font-size:12px">${x.workout ? icon('check', 12, c.c, 2.8) : '+'} ${esc(short(x.item))}</span></div>`; }).join('');
+  const hasLift = d.sessions.some((x) => x.item.kind !== 'run' && x.item.kind !== 'rest');
+  return `<div class="day-row ${d.date === today && d.state !== 'done' ? 'today' : ''}" data-day="${d.date}" data-act="openDay" data-date="${d.date}" role="button" tabindex="0" aria-label="${D.DOW_LONG[D.dowIndex(d.date)]}: ${esc(it.title)}${d.extras.length ? ' plus ' + d.extras.map((x) => esc(x.item.title)).join(', ') : ''}. Open day${hasLift ? ' to see the exercises' : ''}">${dn}${dot}
+    <div class="grow"><div style="font-size:15px;font-weight:700" class="${d.state === 'skipped' ? 'strike' : ''}">${title}</div><div class="muted small">${sub}${d.state === 'missed' ? ' · missed' : ''}</div>${extras}</div>${right}</div>`;
 }
 
 function thisWeek() {
   const today = D.today();
   const wk = viewWeek || D.weekStart(today);
   const { vol, days } = store.weekPlan(wk);
-  const planned = days.filter((d) => d.item.kind !== 'rest');
-  const done = days.filter((d) => d.done).length;
+  const all = days.flatMap((d) => d.sessions.filter((x) => x.item.kind !== 'rest' && x.state !== 'skipped'));
+  const planned = all;
+  const done = all.filter((x) => x.workout).length;
   const milesDone = days.flatMap((d) => d.workouts).filter((w) => w.type === 'run').reduce((s, w) => s + (w.distanceMi || 0), 0);
   const isCurrent = wk === D.weekStart(today);
   const quick = [['Run', 'run', '#2F5BD8'], ['Strength', 'strength', '#C94420'], ['Bodyweight', 'bodyweight', '#6D4FC2'], ['Mobility', 'hip-mobility', '#1F7A52']];
@@ -75,6 +83,7 @@ function thisWeek() {
         <button class="round-btn" style="width:32px;height:32px;box-shadow:none;background:#F1F2F5" data-act="wk" data-d="7" aria-label="Next week">${icon('chev', 16)}</button></div>
         <span class="pill" style="background:#E3F2EA;color:#1F7A52">${done} of ${planned.length} done</span></div>
       ${days.map((d) => dayRow(d, today)).join('')}
+      <div class="muted small" style="padding:8px 12px 0">Tap a day to see its exercises, edit the moves or add a workout.</div>
       <div class="muted small" style="padding:8px 12px 2px">Running: ${fmt(milesDone, 1)} of ${fmt(vol.miles, 1)} mi</div>
     </section>
     <section><div class="eyebrow" style="margin-bottom:8px">Did something not on the plan?</div>
@@ -84,12 +93,15 @@ function thisWeek() {
 function myWeek() {
   const s = store.settings();
   const cur = store.settingsForWeek(D.addDays(D.weekStart(D.today()), 7)).plan;
-  if (!draft) draft = { ...cur, race: cur.race ? { ...cur.race } : null, applyNow: false };
+  if (!draft) draft = { ...cur, doubleDays: [...(cur.doubleDays || Array(7).fill(false))], race: cur.race ? { ...cur.race } : null, applyNow: false };
   const dd = draft;
   return `<section class="card" style="display:flex;flex-direction:column;gap:14px">
       <h2>Days you can train</h2>
       <div class="days-pick">${D.DOW.map((n, i) => `<button class="${dd.availableDays[i] ? 'on' : ''}" data-act="day" data-i="${i}" aria-pressed="${dd.availableDays[i]}">${n.slice(0, 2)}</button>`).join('')}</div>
       <p class="note">${dd.availableDays.filter(Boolean).length} days. The coach places runs, strength and hip work so hard days don't stack up.</p>
+      <div class="field"><span>Run + lift days</span>
+        <div class="days-pick dbl">${D.DOW.map((n, i) => `<button class="${dd.doubleDays[i] ? 'on' : ''}" data-act="dbl" data-i="${i}" aria-pressed="${!!dd.doubleDays[i]}" aria-label="${D.DOW_LONG[i]}: run and lift">${n.slice(0, 2)}</button>`).join('')}</div></div>
+      <p class="note">${dd.doubleDays.some(Boolean) ? `On ${dd.doubleDays.map((v, i) => (v ? D.DOW[i] : null)).filter(Boolean).join(', ')} you get a run and a lift. The coach keeps heavy legs away from your long run.` : 'Days you have time to run and lift. Optional.'}</p>
       <label class="field"><span>Long run day</span><select class="input" id="mw-long">${D.DOW_LONG.map((n, i) => `<option value="${i}" ${dd.longRunDay === i ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <div class="grid2"><label class="field"><span>Weekday time (min)</span><select class="input" id="mw-min">${[30, 45, 60, 75].map((m) => `<option ${dd.weekdayMinutes === m ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
         <label class="field"><span>Easy pace (min/mi)</span><input class="input" id="mw-pace" inputmode="decimal" value="${esc(dd.easyPace)}"></label></div>
@@ -143,6 +155,9 @@ export default {
   },
   actions: {
     wk: (el) => { viewWeek = D.addDays(viewWeek || D.weekStart(D.today()), Number(el.dataset.d)); refresh(); },
+    openDay: (el) => go(`#/day/${el.dataset.date}`),
+    changeDay: (el) => go(`#/change/${el.dataset.orig}`),
+    startRef: (el) => startRef(el.dataset.ref),
     start: (el) => {
       const p = store.planFor(el.dataset.date);
       if (p.item.kind === 'run') openRunSheet({ date: p.date, item: p.item, origDate: p.origDate });
@@ -160,7 +175,18 @@ export default {
       else if (k === 'strength') openWorkoutPicker(D.today());
       else startTemplate(k, D.today(), null);
     },
-    day: (el) => { readDraft(); const i = Number(el.dataset.i); draft.availableDays = draft.availableDays.map((v, j) => (j === i ? !v : v)); refresh(); },
+    day: (el) => {
+      readDraft(); const i = Number(el.dataset.i);
+      draft.availableDays = draft.availableDays.map((v, j) => (j === i ? !v : v));
+      if (!draft.availableDays[i]) draft.doubleDays = draft.doubleDays.map((v, j) => (j === i ? false : v));
+      refresh();
+    },
+    dbl: (el) => {
+      readDraft(); const i = Number(el.dataset.i);
+      draft.doubleDays = draft.doubleDays.map((v, j) => (j === i ? !v : v));
+      if (draft.doubleDays[i]) draft.availableDays = draft.availableDays.map((v, j) => (j === i ? true : v));
+      refresh();
+    },
     addRace: () => { readDraft(); draft.race = { name: '', date: D.addDays(D.today(), 7 * 20), distance: 'half' }; refresh(); },
     noRace: () => { readDraft(); draft.race = null; refresh(); },
     applyNow: () => { readDraft(); },

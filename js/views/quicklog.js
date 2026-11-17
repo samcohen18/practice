@@ -62,13 +62,13 @@ export function openWorkoutPicker(date, origDate) {
   });
 }
 
-export async function startTemplate(templateId, date, origDate) {
+export async function startTemplate(templateId, date, origDate, { ref = null, item = null } = {}) {
   const cur = store.currentSession();
-  if (cur && cur.templateId !== templateId) {
+  if (cur && (ref ? cur.ref !== ref : cur.templateId !== templateId)) {
     toast('Finish or discard your workout in progress first.');
     closeSheet(true); go('#/workout'); return;
   }
-  if (!cur) await store.startSession({ templateId, date: date || D.today(), origDate: origDate || null });
+  if (!cur) await store.startSession({ templateId, date: date || D.today(), origDate: origDate || null, ref, item });
   closeSheet(true); go('#/workout');
 }
 

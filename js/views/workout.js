@@ -6,6 +6,8 @@ import * as D from '../dates.js';
 import { EX_BY_ID, swapsFor } from '../data/exercises.js';
 import { icon, esc, fmt, toast, openSheet, closeSheet, confirmSheet, num } from '../ui.js';
 import { go, refresh } from '../main.js';
+import { openExercisePicker } from './expicker.js';
+import * as fx from '../celebrate.js';
 
 let ticker = null;
 const REST_SECS = { strength: 75, bodyweight: 45, mobility: 0 };
@@ -50,7 +52,8 @@ function exerciseCard(sess, i) {
     <div class="cue">${esc(ex.cue)}${ex.hip === 'friendly' ? ' <b style="color:#1F7A52">Hip-friendly.</b>' : ex.hip === 'caution' ? ' <b style="color:#C94420">Go easy if your hip flexor or groin is sore.</b>' : ''}</div>
     ${head}${rows}
     <div class="row between"><span class="pill" style="background:${newBest ? '#FCEFD3' : '#F1F2F5'};color:${newBest ? '#8A5A00' : '#5B6475'}">${icon('flag', 13, newBest ? '#8A5A00' : '#5B6475')}${esc(bestTxt)}</span>
-      <button class="link-btn" data-act="addSet" data-i="${i}">+ Add set</button></div></section>`;
+      <span class="row" style="gap:14px">${e.sets.length > 1 && !e.sets[e.sets.length - 1].done ? `<button class="link-btn" style="color:#5B6475" data-act="rmSet" data-i="${i}">− Set</button>` : ''}<button class="link-btn" data-act="addSet" data-i="${i}">+ Add set</button></span></div>
+    ${sess.exercises.length > 1 ? `<button class="link-btn" style="align-self:flex-start;color:#B3261E;font-size:13px" data-act="rmEx" data-i="${i}">${icon('trash', 13, '#B3261E')}Remove from this workout</button>` : ''}</section>`;
 }
 
 function restBar(sess) {
@@ -59,6 +62,15 @@ function restBar(sess) {
   if (!left) return '';
   return `<div class="rest" id="rest"><div class="row" style="gap:10px">${icon('timer', 20, '#FFB4A0')}<span style="font-size:15px;font-weight:700">Rest</span><span class="clock" id="rest-clock">${mmss(left)}</span></div>
     <div class="row" style="gap:6px"><button class="btn soft small" style="background:rgba(255,255,255,.12);color:#fff" data-act="restAdd">+15s</button><button class="btn soft small" style="background:rgba(255,255,255,.12);color:#fff" data-act="restSkip">Skip</button></div></div>`;
+}
+
+async function replaceEx(i, id) {
+  const sess = store.currentSession(); const ex = EX_BY_ID[id];
+  const exercises = structuredClone(sess.exercises);
+  const old = EX_BY_ID[exercises[i].exId];
+  const target = ex.mode === old?.mode ? exercises[i].target : store.DEFAULT_TARGET[ex.mode];
+  exercises[i] = { exId: id, target, sets: store.newSets(id, exercises[i].sets.length, target) };
+  await store.updateSession({ exercises }); closeSheet(true); toast(`Swapped to ${ex.name}`); refresh();
 }
 
 export default {
@@ -88,6 +100,7 @@ export default {
         ${others.map(({ e, i }) => { const ex = EX_BY_ID[e.exId]; const n = e.sets.filter((s) => s.done).length; return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="go" data-i="${i}">
           <span style="width:28px;height:28px;border-radius:14px;background:${n === e.sets.length ? '#1F7A52' : '#F1F2F5'};color:${n === e.sets.length ? '#fff' : '#14213D'};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">${n === e.sets.length ? icon('check', 14, '#fff', 2.6) : i + 1}</span>
           <span class="grow"><span class="name" style="display:block">${esc(ex.name)}</span><span class="meta">${n} of ${e.sets.length} sets</span></span></button>`; }).join('')}</section>
+      <button class="btn ghost block" data-act="addEx">${icon('plus', 16)}Add an exercise</button>
       <button class="link-btn" style="align-self:center;color:#B3261E" data-act="discard">Discard workout</button>
       <div class="bottom-cta"><div><button class="btn block" data-act="finish">Finish workout</button></div></div>
     </main>`;
@@ -120,6 +133,14 @@ export default {
       const exercises = structuredClone(sess.exercises);
       const s = exercises[i].sets[j];
       s.done = !s.done;
+      // new personal best? celebrate once per exercise per workout
+      const exId = exercises[i].exId; const prior = store.bestSet(exId);
+      const shown = sess.prShown || [];
+      if (s.done && prior && store.betterSet(s, prior) && !shown.includes(exId)) {
+        const r = el.getBoundingClientRect(); const ex = EX_BY_ID[exId];
+        fx.enqueue(() => fx.newBest({ getBoundingClientRect: () => r }, `${ex.name}: ${setLabel(ex, s)}`));
+        await store.updateSession({ prShown: [...shown, exId] });
+      }
       const rest = REST_SECS[sess.kind] || 0;
       const allDone = exercises[i].sets.every((x) => x.done);
       const patch = { exercises, restUntil: s.done && rest && !allDone ? new Date(Date.now() + rest * 1000).toISOString() : null };
@@ -145,9 +166,11 @@ export default {
         render: () => `<div class="sheet-hd"><h2>Swap ${esc(EX_BY_ID[e.exId].name)}</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
           <p class="note">These work the same muscles, so the workout keeps its purpose.</p>
           <div class="card" style="padding:4px 16px">${opts.length ? opts.map((o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="pickEx" data-id="${o.id}">
-            <span class="grow"><span class="name" style="display:block">${esc(o.name)}</span><span class="meta">${o.equip === 'dumbbell' ? 'Dumbbells' : 'No equipment'}${o.hip === 'friendly' ? ' · hip-friendly' : o.hip === 'caution' ? ' · careful with hips' : ''}</span></span>${icon('chev', 16, '#6B7385')}</button>`).join('') : '<p class="note" style="padding:12px 0">No swaps for this one.</p>'}</div>`,
+            <span class="grow"><span class="name" style="display:block">${esc(o.name)}</span><span class="meta">${o.equip === 'dumbbell' ? 'Dumbbells' : 'No equipment'}${o.hip === 'friendly' ? ' · hip-friendly' : o.hip === 'caution' ? ' · careful with hips' : ''}</span></span>${icon('chev', 16, '#6B7385')}</button>`).join('') : '<p class="note" style="padding:12px 0">No swaps for this one.</p>'}</div>
+          <button class="btn ghost block" data-act="allEx">${icon('search', 15)}Pick any exercise</button>`,
         actions: {
           close: () => closeSheet(),
+          allEx: () => openExercisePicker({ title: `Swap ${EX_BY_ID[e.exId].name}`, replacing: e.exId, inList: sess.exercises.map((x) => x.exId), onPick: (id) => replaceEx(i, id) }),
           pickEx: async (b) => {
             const ex = EX_BY_ID[b.dataset.id];
             const exercises = structuredClone(sess.exercises);
@@ -161,6 +184,30 @@ export default {
           },
         },
       });
+    },
+    rmSet: async (el) => {
+      const i = +el.dataset.i; const sess = store.currentSession();
+      const exercises = structuredClone(sess.exercises);
+      if (exercises[i].sets.length > 1) exercises[i].sets.pop();
+      await store.updateSession({ exercises }); refresh();
+    },
+    rmEx: async (el) => {
+      const i = +el.dataset.i; const sess = store.currentSession();
+      const exercises = structuredClone(sess.exercises);
+      const [gone] = exercises.splice(i, 1);
+      await store.updateSession({ exercises, current: Math.min(sess.current || 0, exercises.length - 1) });
+      toast(`Removed ${EX_BY_ID[gone.exId]?.name}`, { undo: async () => { const s2 = store.currentSession(); const ex2 = structuredClone(s2.exercises); ex2.splice(i, 0, gone); await store.updateSession({ exercises: ex2, current: i }); refresh(); } });
+      refresh();
+    },
+    addEx: () => {
+      const sess = store.currentSession();
+      openExercisePicker({ inList: sess.exercises.map((x) => x.exId), onPick: async (id) => {
+        const ex = EX_BY_ID[id]; const s2 = store.currentSession();
+        const target = store.DEFAULT_TARGET[ex.mode];
+        const exercises = [...structuredClone(s2.exercises), { exId: id, target, sets: store.newSets(id, ex.group === 'mobility' ? 2 : 3, target) }];
+        await store.updateSession({ exercises, current: exercises.length - 1 });
+        toast(`Added ${ex.name}`); refresh(); window.scrollTo(0, 0);
+      } });
     },
     discard: async () => {
       if (await confirmSheet({ title: 'Discard this workout?', body: 'Nothing from this session will be saved.', ok: 'Discard', danger: true })) {

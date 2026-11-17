@@ -5,7 +5,7 @@ import * as C from './calc.js';
 import * as P from './plan.js';
 import { FOOD_BY_ID, DEFAULT_GO_TOS } from './data/foods.js';
 import { RECIPE_BY_ID } from './data/recipes.js';
-import { TEMPLATES, EX_BY_ID } from './data/exercises.js';
+import { TEMPLATES, EX_BY_ID, EXERCISES } from './data/exercises.js';
 
 export const MEALS = [
   { id: 'breakfast', label: 'Breakfast' },
@@ -196,6 +196,48 @@ export function prList(sinceDate) {
     .sort((a, b) => b.best.date.localeCompare(a.best.date));
 }
 
+// ---------------- her own exercises & lift versions ----------------
+/** Her own exercises join the library (so last-time numbers, bests and swaps work for them too). */
+function syncCustomExercises() {
+  for (const k of Object.keys(EX_BY_ID)) if (EX_BY_ID[k].custom) delete EX_BY_ID[k];
+  for (const c of db.all('customExercises')) {
+    EX_BY_ID[c.id] = { id: c.id, name: c.name, group: c.group || 'custom', mode: c.mode || 'reps', equip: c.mode === 'reps' || c.mode === 'each' ? 'dumbbell' : 'none', cue: c.cue || 'Your own exercise.', custom: true };
+  }
+}
+db.onChange((coll) => { if (!coll || coll === 'customExercises') syncCustomExercises(); });
+export function allExercises() { syncCustomExercises(); return [...EXERCISES, ...Object.values(EX_BY_ID).filter((e) => e.custom)]; }
+export async function saveCustomExercise({ name, mode, group }) {
+  const id = 'my-' + db.uid();
+  await db.put('customExercises', { id, name: name.trim(), mode, group: group || 'custom' });
+  syncCustomExercises();
+  return EX_BY_ID[id];
+}
+export const DEFAULT_TARGET = { reps: 10, 'reps-bw': 12, each: 10, time: 30 };
+
+/** The movements for a planned lift: this day's version, else her saved version of the workout, else the coach's. */
+export function exercisesFor(item) {
+  if (!item) return [];
+  if (item.exercises) return item.exercises;
+  const mine = item.templateId && db.get('myTemplates', item.templateId);
+  if (mine?.items) return mine.items;
+  return TEMPLATES[item.templateId]?.items || [];
+}
+export const hasMyVersion = (templateId) => !!db.get('myTemplates', templateId)?.items;
+/** Rough session length: ~2 min a set with rest for weights, less for bodyweight and mobility, plus warm-up. */
+export function liftMinutes(item, exercises = exercisesFor(item)) {
+  const per = item.kind === 'mobility' ? 1.1 : item.kind === 'bodyweight' ? 1.4 : 2;
+  const sets = exercises.reduce((n, e) => n + (Number(e.sets) || 0), 0);
+  return Math.max(5, Math.round((sets * per + (item.kind === 'mobility' ? 0 : 5)) / 5) * 5);
+}
+function decorateLift(item) {
+  if (!item || item.kind === 'run' || item.kind === 'rest') return item;
+  const custom = item.exercises || hasMyVersion(item.templateId);
+  if (!custom) return item;
+  const ex = exercisesFor(item);
+  const minutes = liftMinutes(item, ex);
+  return { ...item, minutes, detail: `${minutes} min · ${ex.length} exercise${ex.length === 1 ? '' : 's'}${item.exercises ? '' : ' · your version'}` };
+}
+
 // ---------------- plan with edits ----------------
 const skippedLongWeeks = () => new Set(db.where('planEdits', (e) => e.action === 'skip' && e.slot === 'long').map((e) => D.weekStart(e.id)));
 
@@ -232,14 +274,112 @@ function computeWeekPlan(wkStart) {
   const base = P.baseWeek(s, wkStart, skippedLongWeeks());
   const days = P.applyEdits(base, db.all('planEdits'));
   const t = D.today();
+  const adds = db.all('planAdds');
   for (const d of days) {
+    d.item = decorateLift(d.item);
     const ws = workoutsFor(d.date);
     d.workouts = ws;
-    d.done = d.item.kind !== 'rest' && ws.some((w) => P.satisfies(w, d.item));
+    // Every planned session on the day: the coach's main one, the coach's second one on a run + lift day, and any she added.
+    const main = { ref: 'p:' + d.origDate, origDate: d.origDate, source: 'plan', item: d.item, status: d.status };
+    const extras = [];
+    if (d.double) {
+      const ref = 'c:' + d.date;
+      const e = db.get('planEdits', ref);
+      if (!e || e.action !== 'skip') extras.push({ ref, source: 'coach', item: decorateLift(e?.custom ? { ...d.double.item, exercises: e.custom, customized: true } : d.double.item), status: 'planned' });
+    }
+    for (const a of adds.filter((x) => x.date === d.date).sort((x, y) => (x.createdAt || '').localeCompare(y.createdAt || ''))) {
+      extras.push({ ref: 'm:' + a.id, source: 'mine', item: decorateLift(a.item), status: 'planned' });
+    }
+    const sessions = [main, ...extras];
+    matchWorkouts(sessions, ws);
+    for (const x of sessions) x.state = x.item.kind === 'rest' ? 'rest' : x.workout ? 'done' : x.status === 'skipped' ? 'skipped' : d.date < t ? 'missed' : d.date === t ? 'today' : 'upcoming';
+    d.sessions = sessions;
+    d.extras = extras;
+    d.done = d.item.kind !== 'rest' && !!main.workout;
     d.extra = d.item.kind === 'rest' && ws.length > 0;
     d.state = d.done ? 'done' : d.item.kind === 'rest' ? (d.extra ? 'done' : 'rest') : d.status === 'skipped' ? 'skipped' : d.date < t ? 'missed' : d.date === t ? 'today' : 'upcoming';
   }
   return { vol: base.vol, days };
+}
+
+/** Pair logged workouts with planned sessions: first by the session they were started from, then by type. */
+function matchWorkouts(sessions, ws) {
+  const free = [...ws];
+  for (const s of sessions) {
+    const i = free.findIndex((w) => w.planRef && (w.planRef === s.ref || (s.source === 'plan' && w.planRef === s.origDate)));
+    if (i >= 0) s.workout = free.splice(i, 1)[0];
+  }
+  const order = [...sessions].sort((a, b) => (a.status === 'skipped') - (b.status === 'skipped'));
+  for (const s of order) {
+    if (s.workout || s.item.kind === 'rest') continue;
+    const j = free.findIndex((w) => P.satisfies(w, s.item));
+    if (j >= 0) s.workout = free.splice(j, 1)[0];
+  }
+}
+
+/** Find a planned session by its ref: p:<origDate> (coach's main), c:<date> (coach's second), m:<id> (hers). */
+export function sessionByRef(ref) {
+  if (!ref) return null;
+  const [kind, key] = [ref.slice(0, 1), ref.slice(2)];
+  let date = key;
+  if (kind === 'm') { const a = db.get('planAdds', key); if (!a) return null; date = a.date; }
+  if (kind === 'p') {
+    const { days } = weekPlan(D.weekStart(key));
+    const d = days.find((x) => x.origDate === key && x.item.kind !== 'rest') || days.find((x) => x.origDate === key);
+    if (!d) return null;
+    return { ...d.sessions[0], date: d.date, day: d };
+  }
+  const d = planFor(date);
+  const s = d?.sessions.find((x) => x.ref === ref);
+  return s ? { ...s, date: d.date, day: d } : null;
+}
+
+/** Save her changes to a lift's movements: just this day, or every time this workout comes up. */
+export async function saveLiftMovements(ref, exercises, { everyTime = false } = {}) {
+  const s = sessionByRef(ref); if (!s) return;
+  const clean = exercises.map((e) => ({ exId: e.exId, sets: Math.max(1, Math.round(Number(e.sets) || 1)), target: Math.max(1, Math.round(Number(e.target) || 1)) }));
+  if (everyTime && s.item.templateId && TEMPLATES[s.item.templateId]) {
+    await db.put('myTemplates', { id: s.item.templateId, items: clean });
+    return clearLiftMovements(ref);
+  }
+  if (ref.startsWith('m:')) { const a = db.get('planAdds', ref.slice(2)); return db.put('planAdds', { ...a, item: { ...a.item, exercises: clean } }); }
+  if (ref.startsWith('c:')) return editPlan(ref, { custom: clean });
+  return editPlan(s.origDate, { custom: clean });
+}
+/** Back to the version this session would have without day-only changes. */
+export async function clearLiftMovements(ref) {
+  if (ref.startsWith('m:')) { const a = db.get('planAdds', ref.slice(2)); if (!a?.item.exercises || !a.item.templateId || !TEMPLATES[a.item.templateId]) return; const { exercises, ...item } = a.item; return db.put('planAdds', { ...a, item }); }
+  const id = ref.startsWith('c:') ? ref : ref.slice(2);
+  const e = db.get('planEdits', id); if (!e?.custom) return;
+  const { custom, ...rest } = e;
+  if (Object.keys(rest).filter((k) => !['id', 'coll', 'key', 'updatedAt', 'deleted', 'dirty'].includes(k)).length) return db.put('planEdits', rest, { replace: true });
+  return db.remove('planEdits', id);
+}
+export async function resetMyVersion(templateId) { return db.remove('myTemplates', templateId); }
+
+export const templateItem = (id) => P.templateItem(id, settings()?.plan || {});
+/** She adds a workout to a day. */
+export async function addPlanned(date, item) {
+  const id = db.uid();
+  await db.put('planAdds', { id, date, item, createdAt: new Date().toISOString() });
+  return 'm:' + id;
+}
+/** Remove a second session (hers, or the coach's on a run + lift day). */
+export async function removeExtra(ref) {
+  if (ref.startsWith('m:')) return db.remove('planAdds', ref.slice(2));
+  if (ref.startsWith('c:')) return editPlan(ref, { action: 'skip' });
+}
+export async function restoreExtra(ref, prev) {
+  if (ref.startsWith('m:')) return db.put('planAdds', { ...prev, deleted: false });
+  if (ref.startsWith('c:')) return clearEdit(ref);
+}
+/** Move or replace a second session. A coach one becomes hers once she changes it. */
+export async function changeExtra(ref, { toDate, item }) {
+  const s = sessionByRef(ref); if (!s) return null;
+  const next = { date: toDate || s.date, item: item || s.item };
+  if (ref.startsWith('m:')) { const a = db.get('planAdds', ref.slice(2)); await db.put('planAdds', { ...a, ...next }); return ref; }
+  await editPlan(ref, { action: 'skip' });
+  return addPlanned(next.date, next.item);
 }
 
 export function planFor(date) { return weekPlan(D.weekStart(date)).days.find((d) => d.date === date); }
@@ -289,13 +429,16 @@ export function coachNote(date) {
   const vol = weekPlan(D.weekStart(date)).vol;
   if (!p) return '';
   const race = vol.race ? ` ${vol.weeksLeft} week${vol.weeksLeft === 1 ? '' : 's'} to race day.` : '';
+  if (p.item.kind === 'rest' && p.extras?.length) { const x = p.extras.find((e) => !e.workout); return x ? `${x.item.title} today. ${x.item.why || ''}`.trim() : 'Nice work today. Get some protein in and enjoy the rest of your day.'; }
+  if (p.done && p.extras?.some((x) => !x.workout)) { const x = p.extras.find((e) => !e.workout); return `First one done. Next up: ${x.item.title.toLowerCase()}.`; }
   if (p.done) return `Nice work today. ${p.item.kind === 'run' ? 'Refuel with carbs and protein in the next couple of hours.' : 'Get some protein in and enjoy the rest of your day.'}`;
   if (p.status === 'skipped') return 'Skipped today, and that is OK. The rest of your week is still on track.';
   if (p.item.kind === 'rest') return `Rest day. ${vol.lighter ? 'This is your lighter week, so recover well.' : 'Your body gets stronger while it recovers.'} A walk or a stretch is a bonus.`;
   const lead = {
     long: 'Long run day.', easy: 'Easy run today.', intervals: 'Interval day.', tempo: 'Tempo run today.', 'incline-walk': 'Incline walk today.', race: 'Race day!',
   }[p.item.runType] || (p.item.templateId === 'lower-hips' ? 'Strength day: hips and legs.' : p.item.templateId === 'upper-core' ? 'Strength day: arms, shoulders and core.' : p.item.kind === 'mobility' ? 'Hip mobility today.' : 'Strength day.');
-  return `${lead} ${p.item.why}${race}`;
+  const plus = p.extras?.find((x) => !x.workout);
+  return `${lead} ${p.item.why}${plus ? ` ${plus.item.kind === 'run' ? `Then ${/^[aeiou]/i.test(plus.item.title) ? 'an' : 'a'} ${plus.item.title.toLowerCase()}${plus.item.miles ? ` (${plus.item.miles} mi)` : ''}` : `${p.item.kind === 'run' ? 'After your run' : 'Then'}: ${plus.item.title.replace(/^Strength: /, '').toLowerCase()}`}.` : ''}${race}`;
 }
 
 // ---------------- meal plan & grocery ----------------
@@ -352,22 +495,22 @@ export async function addGroceryExtra(wkStart, name) {
 
 // ---------------- sessions (workout in progress) ----------------
 export const currentSession = () => db.get('session', 'current');
-export async function startSession({ templateId, date, origDate }) {
-  const t = TEMPLATES[templateId];
-  const exercises = t.items.map((it) => {
-    const ex = EX_BY_ID[it.exId];
-    const last = lastTime(it.exId);
-    return {
-      exId: it.exId, target: it.target,
-      sets: Array.from({ length: it.sets }, (_, i) => {
-        const prev = last?.sets[i] || last?.sets[last.sets.length - 1];
-        if (ex.mode === 'time') return { secs: prev?.secs ?? it.target, done: false };
-        if (ex.mode === 'reps') return { lb: prev?.lb ?? '', reps: prev?.reps ?? it.target, done: false };
-        return { reps: prev?.reps ?? it.target, lb: ex.equip === 'dumbbell' ? (prev?.lb ?? '') : undefined, done: false };
-      }),
-    };
+export function newSets(exId, count, target) {
+  const ex = EX_BY_ID[exId];
+  const last = lastTime(exId);
+  return Array.from({ length: count }, (_, i) => {
+    const prev = last?.sets[i] || last?.sets[last.sets.length - 1];
+    if (ex.mode === 'time') return { secs: prev?.secs ?? target, done: false };
+    if (ex.mode === 'reps') return { lb: prev?.lb ?? '', reps: prev?.reps ?? target, done: false };
+    return { reps: prev?.reps ?? target, lb: ex.equip === 'dumbbell' ? (prev?.lb ?? '') : undefined, done: false };
   });
-  return db.put('session', { id: 'current', templateId, title: t.title, kind: t.kind, date, origDate, startedAt: new Date().toISOString(), exercises, warmup: t.warmup, current: 0 });
+}
+export async function startSession({ templateId, date, origDate, ref = null, item = null }) {
+  syncCustomExercises();
+  const t = TEMPLATES[templateId] || { title: item?.title || 'My lift', kind: item?.kind || 'strength', warmup: [], items: [] };
+  const list = item ? exercisesFor(item) : (db.get('myTemplates', templateId)?.items || t.items);
+  const exercises = list.filter((it) => EX_BY_ID[it.exId]).map((it) => ({ exId: it.exId, target: it.target, sets: newSets(it.exId, it.sets, it.target) }));
+  return db.put('session', { id: 'current', templateId, ref, title: item?.title || t.title, kind: item?.kind || t.kind, date, origDate, startedAt: new Date().toISOString(), exercises, warmup: t.warmup, current: 0 });
 }
 export async function updateSession(patch) { const s = currentSession(); if (!s) return; return db.put('session', { ...s, ...patch }); }
 export async function finishSession({ kcalOverride } = {}) {
@@ -375,7 +518,7 @@ export async function finishSession({ kcalOverride } = {}) {
   const minutes = Math.max(1, Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000));
   const exercises = s.exercises.map((e) => ({ ...e, sets: e.sets.filter((x) => x.done) })).filter((e) => e.sets.length);
   const type = s.kind === 'mobility' ? 'mobility' : s.kind === 'bodyweight' ? 'bodyweight' : 'strength';
-  const w = await saveWorkout({ date: s.date, type, title: s.title, templateId: s.templateId, minutes: s.minutesOverride || minutes, exercises, planRef: s.origDate, endedAt: new Date().toISOString(), kcalOverride });
+  const w = await saveWorkout({ date: s.date, type, title: s.title, templateId: s.templateId, minutes: s.minutesOverride || minutes, exercises, planRef: s.ref && !s.ref.startsWith('p:') ? s.ref : s.origDate, endedAt: new Date().toISOString(), kcalOverride });
   await db.remove('session', 'current');
   return w;
 }

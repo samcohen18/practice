@@ -75,6 +75,15 @@ Built-in foods, her own foods, go-tos and recipes work offline. "Search more foo
 
 ---
 
+### Training features worth knowing
+- **Run + lift days** (Train > My week): on the days she picks, the coach pairs a run with a lift (or a lift with an easy run). Weekly miles stay the same: the easy miles are split across easy runs. Heavy leg work never goes on the long-run day, the day before it, or next to another leg day.
+- **Tap any day** on Train to see everything planned for it, including every exercise in a lift. Add a workout to any day (a lift, an easy run, an incline walk, or "Build your own lift").
+- **Edit movements** on any lift: reorder, swap, remove, add (search the library or add her own exercise), and set sets and reps. Save for just that day or for every time that workout comes up. She can undo either.
+- During a workout she can add or remove exercises and sets, and swap to any exercise.
+
+### Celebrations
+Closing a ring gets a quick banner with sparks. Closing all three gets a full-screen moment: the rings draw in, spin and burst, then fireworks and confetti. Streak milestones (3, 7, 14, 21, 30, 50, 75, 100... days) get a growing flame with embers. Personal bests, a perfect week, hitting the water goal and the first workout get their own moments. Each fires once, only after her own tap (never from a backup sync). The Fuel ring doesn't celebrate if one big meal pushes her more than 10% past the target. There are on/off switches for celebrations and sounds in Settings, and the animations respect the iPhone's Reduce Motion setting. Haptics use the iOS 18 switch trick and work best-effort.
+
 ## 4. Tests
 
 ```bash

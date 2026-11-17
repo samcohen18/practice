@@ -26,6 +26,7 @@ def toast_text(pg):
 def new_page(browser, errors):
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True, accept_downloads=True)
     pg = ctx.new_page()
+    pg.add_init_script("try{ if(!sessionStorage.getItem('fxTest')) localStorage.setItem('practice.celebrations','off') }catch(e){}")
     pg.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
     pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
     return ctx, pg
@@ -34,18 +35,18 @@ def onboard(pg, name="Jess"):
     pg.goto(BASE)
     pg.wait_for_selector("#o-name")
     pg.fill("#o-name", name)
-    clk("text=Continue")
+    pg.click("text=Continue")
     pg.fill("#o-age", "24"); pg.fill("#o-lb", "150"); pg.fill("#o-ft", "5"); pg.fill("#o-in", "6")
     pg.select_option("#o-life", "desk")
-    clk("text=Continue")
+    pg.click("text=Continue")
     pg.wait_for_selector("#o-base")
     return pg
 
 def finish_onboarding(pg):
-    clk("text=Continue")  # targets
+    pg.click("text=Continue")  # targets
     pg.wait_for_selector("#o-long")
-    clk("text=Continue")  # training
-    clk("text=Let's go")
+    pg.click("text=Continue")  # training
+    pg.click("text=Let's go")
     pg.wait_for_selector("text=Today's practice")
 
 def clk(sel):
@@ -461,6 +462,126 @@ with sync_playwright() as p:
     check("my week: next week has Wednesday off", nxt[2]["item"]["kind"] == "rest")
     check("my week: this week unchanged", cur[2]["item"]["kind"] != "rest" or plan[2]["item"]["kind"] == "rest")
 
+    # ---------------- 7b. Run + lift days, day page, previews, editing moves, adding workouts ----------------
+    dow = js(pg, f"window.__practice.D.dowIndex('{today}')")
+    pg.goto(BASE + "#/train/myweek"); pg.wait_for_selector("text=Run + lift days")
+    clk(f".days-pick.dbl button >> nth={dow}")
+    check("my week: run + lift day highlighted", "on" in (pg.locator(".days-pick.dbl button").nth(dow).get_attribute("class") or ""))
+    pg.check("#mw-now")
+    clk("button[data-act='savePlan']")
+    tp = js(pg, f"window.__practice.store.planFor('{today}')")
+    kinds = [tp["item"]["kind"]] + [x["item"]["kind"] for x in tp["extras"]]
+    check("run + lift day: today has a run and a lift", len(tp["extras"]) == 1 and ("run" in kinds) and any(k != "run" for k in kinds), str(kinds))
+    pg.goto(BASE + "#/today"); pg.wait_for_selector("text=Today's practice")
+    check("today: card shows both sessions", pg.locator(".coach .wk").count() >= 2)
+    shot(pg, "20_today_double")
+    pg.goto(BASE + "#/train"); pg.wait_for_selector(".day-row")
+    while pg.locator(f".day-row[data-date='{today}']").count() == 0: clk("button[aria-label='Previous week']")
+    check("train: row shows the second session", pg.locator(f".day-row[data-date='{today}'] .extra-line").count() == 1)
+    pg.click(f".day-row[data-date='{today}'] .grow"); pg.wait_for_timeout(200)
+    check("train: tapping a day opens the day page", pg.url.endswith(f"#/day/{today}") and pg.locator(".sess-card").count() == 2)
+    shot(pg, "21_day")
+
+    # preview a future lift
+    lifts = js(pg, f"""(()=>{{const P=window.__practice; const out=[]; for (const k of [0,7,14]) {{ const wk=P.D.addDays(P.D.weekStart('{today}'),k); for (const d of P.store.weekPlan(wk).days) for (const x of d.sessions) if (x.item.kind!=='run' && x.item.kind!=='rest' && d.date>'{today}' && x.item.templateId) out.push({{ref:x.ref,date:d.date,t:x.item.templateId}}); }} return out; }})()""")
+    L = lifts[0]
+    twin = next((x for x in lifts[1:] if x["t"] == L["t"]), None)
+    orig = js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{L['ref']}').item).map(e=>e.exId)")
+    pg.goto(BASE + f"#/lift/{L['ref']}"); pg.wait_for_selector("button[data-act='edit']")
+    check("lift preview: lists every exercise", pg.locator(".ex-row").count() == len(orig), f"{pg.locator('.ex-row').count()} vs {len(orig)}")
+    check("lift preview: no Start for a future day", pg.locator("button[data-act='start']").count() == 0)
+    shot(pg, "22_lift_preview")
+    # edit for just that day: reorder, more sets, remove last, add wall sit
+    clk("button[data-act='edit']")
+    clk("button[data-act='mv'][data-i='1'][data-d='-1']")
+    clk("button[data-act='step'][data-i='0'][data-k='sets'][data-d='1']")
+    clk(f"button[data-act='rmEx'][data-i='{len(orig)-1}']")
+    clk("button[data-act='addEx']")
+    pg.fill("#ex-q", "wall sit"); pg.wait_for_timeout(150)
+    clk(".sheet button[data-act='pickEx']")
+    shot(pg, "23_lift_edit")
+    clk("button[data-act='save']")
+    clk(".sheet button[data-act='justThis']")
+    now = js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{L['ref']}').item)")
+    ids = [e["exId"] for e in now]
+    check("edit moves: reorder, sets, remove and add all saved", ids[0] == orig[1] and ids[1] == orig[0] and now[0]["sets"] == 4 and ids[-1] == "wall-sit" and orig[-1] not in ids, str(ids))
+    if twin:
+        tw = js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{twin['ref']}').item).map(e=>e.exId)")
+        check("edit moves: 'just this day' leaves other days alone", tw == orig)
+    check("edit moves: preview says changed for this day", "only" in pg.inner_text("main"))
+    clk("button[data-act='resetDay']")
+    check("edit moves: undo day change", js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{L['ref']}').item).map(e=>e.exId)") == orig)
+    # every time
+    clk("button[data-act='edit']")
+    clk("button[data-act='rmEx'][data-i='0']")
+    clk("button[data-act='save']"); clk(".sheet button[data-act='every']")
+    check("edit moves: 'every time' saves her version", js(pg, f"!!window.__practice.db.get('myTemplates','{L['t']}')"))
+    if twin:
+        tw = js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{twin['ref']}').item).map(e=>e.exId)")
+        check("edit moves: other days of that workout use her version", tw == orig[1:], str(tw))
+    clk("button[data-act='resetMine']"); clk(".sheet button[data-act='yes']")
+    check("edit moves: back to coach's version", js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{L['ref']}').item).map(e=>e.exId)") == orig)
+
+    # add workouts to a future day
+    fday = L["date"]
+    n0 = len(js(pg, f"window.__practice.store.planFor('{fday}').extras"))
+    pg.goto(BASE + f"#/day/{fday}"); pg.wait_for_selector("button[data-act='add']")
+    clk("button[data-act='add']"); shot(pg, "24_add_sheet")
+    clk(".sheet button[data-k='upper-core']")
+    ex1 = js(pg, f"window.__practice.store.planFor('{fday}').extras")
+    check("add workout: a lift added to the day", len(ex1) == n0 + 1 and ex1[-1]["item"]["templateId"] == "upper-core")
+    clk("button[data-act='add']"); clk(".sheet button[data-k='easy']")
+    pg.fill("#add-mi", "4"); clk(".sheet button[data-act='addRun']")
+    ex2 = js(pg, f"window.__practice.store.planFor('{fday}').extras")
+    check("add workout: an easy run with her distance", len(ex2) == n0 + 2 and ex2[-1]["item"]["miles"] == 4)
+    clk(f"button[data-act='extraOpts'][data-ref='{ex2[-1]['ref']}']")
+    clk(".sheet button[data-act='swapTo'][data-k='bodyweight']")
+    ex3 = js(pg, f"window.__practice.store.planFor('{fday}').extras")
+    check("add workout: swap an added session", ex3[-1]["item"]["templateId"] == "bodyweight")
+    clk(f"button[data-act='extraOpts'][data-ref='{ex3[-1]['ref']}']"); clk(".sheet button[data-act='rm']")
+    check("add workout: remove it", len(js(pg, f"window.__practice.store.planFor('{fday}').extras")) == n0 + 1)
+    pg.click("[data-toast-undo]"); pg.wait_for_timeout(250)
+    check("add workout: undo remove", len(js(pg, f"window.__practice.store.planFor('{fday}').extras")) == n0 + 2)
+    other = js(pg, f"window.__practice.D.range(window.__practice.D.weekStart('{fday}'),7).find(d=>d>='{today}' && d!=='{fday}')")
+    if other:
+        clk(f"button[data-act='extraOpts'][data-ref='{ex3[-1]['ref']}']"); clk(f".sheet button[data-act='mvTo'][data-d='{other}']")
+        check("add workout: move it to another day", any(x["item"]["templateId"] == "bodyweight" for x in js(pg, f"window.__practice.store.planFor('{other}').extras")))
+
+    # build your own lift today, then do it (clear today's earlier test workouts so it starts fresh)
+    js(pg, f"(async()=>{{for (const w of window.__practice.store.workoutsFor('{today}')) await window.__practice.db.remove('workouts', w.id);}})()")
+    pg.goto(BASE + f"#/day/{today}"); pg.wait_for_selector("button[data-act='add']")
+    clk("button[data-act='add']"); clk(".sheet button[data-k='custom']")
+    check("build your own: opens the editor", "#/lift/m:" in pg.url and pg.locator("button[data-act='cancel']").count() == 1)
+    clk("button[data-act='cancel']")
+    check("build your own: cancel with nothing added removes it", not any(x["item"].get("templateId") == "custom" for x in js(pg, f"window.__practice.store.planFor('{today}').extras")))
+    clk("button[data-act='add']"); clk(".sheet button[data-k='custom']")
+    clk("button[data-act='addEx']"); pg.fill("#ex-q", "plank"); pg.wait_for_timeout(150); clk(".sheet button[data-act='pickEx']")
+    clk("button[data-act='addEx']"); pg.fill("#ex-q", "cable row"); pg.wait_for_timeout(150)
+    check("exercise search: no match offers her own", "Add it as your own" in pg.inner_text(".sheet"))
+    clk(".sheet button[data-act='nxStart']")
+    check("own exercise: name carried from search", pg.input_value("#nx-name") == "cable row")
+    pg.fill("#nx-name", "Cable row"); clk(".sheet button[data-act='nxMode'][data-k='reps']"); clk(".sheet button[data-act='nxSave']")
+    clk("button[data-act='save']")
+    mine = [x for x in js(pg, f"window.__practice.store.planFor('{today}').extras") if x["item"].get("templateId") == "custom"]
+    exs = js(pg, f"window.__practice.store.exercisesFor(window.__practice.store.sessionByRef('{mine[0]['ref']}').item)") if mine else []
+    check("build your own: saved with plank and her own exercise", len(exs) == 2 and exs[0]["exId"] == "plank" and exs[1]["exId"].startswith("my-"), str(exs))
+    shot(pg, "25_my_lift")
+    clk("button[data-act='start']"); pg.wait_for_selector("text=Finish workout")
+    check("my lift: workout runs with her exercises", "Exercise 1 of 2" in pg.inner_text("main"))
+    clk("button[data-act='addEx']"); pg.fill("#ex-q", "glute bridge"); pg.wait_for_timeout(150); clk(".sheet button[data-act='pickEx']")
+    check("workout: add an exercise mid-workout", js(pg, "window.__practice.store.currentSession().exercises.length") == 3)
+    n_sets = js(pg, "window.__practice.store.currentSession().exercises[2].sets.length")
+    clk("button[data-act='rmSet']")
+    check("workout: remove a set", js(pg, "window.__practice.store.currentSession().exercises[2].sets.length") == n_sets - 1)
+    clk("button[data-act='rmEx']")
+    check("workout: remove an exercise", js(pg, "window.__practice.store.currentSession().exercises.length") == 2)
+    clk("button[data-act='toggleSet'] >> nth=0")
+    clk("button[data-act='finish']"); clk(".sheet button[data-act='save']")
+    pg.wait_for_selector("text=Today's practice")
+    s_after = next(x for x in js(pg, f"window.__practice.store.planFor('{today}').extras") if x["ref"] == mine[0]["ref"])
+    check("my lift: finishing marks that session done", bool(s_after.get("workout")))
+    check("custom exercise appears in last-time history", js(pg, f"!!window.__practice.store.lastTime('{exs[1]['exId']}')") and "Cable row" in js(pg, "window.__practice.store.prList().map(x=>x.name).join(',')"))
+
     # ---------------- 8. Streak ----------------
     js(pg, """(async()=>{const P=window.__practice; const s=P.store.settings(); await P.db.saveSettings({createdOn: P.D.addDays(P.D.today(), -3)});})()""")
     pg.wait_for_timeout(100)
@@ -564,6 +685,75 @@ with sync_playwright() as p:
     clk("button[data-act='signOut']")
     check("sync: signed out keeps data", js(pg, f"window.__practice.store.waterFor('{today}')") == 32)
 
+    # new phone: finish welcome screens with different settings, then sign in -> backup wins
+    ctx3, pg3 = new_page(browser, errors)
+    server_settings = {"id": "settings/main", "coll": "settings", "data": {"id": "main", "coll": "settings", "onboarded": True, "createdOn": "2026-10-01", "name": "Jessie", "baseKcal": 1700, "proteinG": 120, "waterOz": 80, "trainMin": 60, "age": 24, "heightIn": 66, "weightLb": 150, "lifestyle": "desk", "plan": {"start": "2026-09-28", "availableDays": [True]*7, "longRunDay": 5, "weekdayMinutes": 60, "startMiles": 10, "easyPace": 11}},
+        "updated_at": "2026-11-01T00:00:00Z", "deleted": False, "synced_at": "2026-11-01T00:00:00Z"}
+    def supa2(route):
+        url = route.request.url; m = route.request.method
+        if "/auth/v1/token?grant_type=password" in url: return route.fulfill(status=200, content_type="application/json", body=json.dumps({"access_token": "tok", "refresh_token": "ref", "expires_in": 3600, "user": {"id": "u1", "email": "jess@example.com"}}))
+        if "/rest/v1/records" in url and m == "GET":
+            return route.fulfill(status=200, content_type="application/json", body=json.dumps([server_settings] if "1970" in url else []))
+        if "/rest/v1/records" in url and m == "POST": return route.fulfill(status=201, body="")
+        route.fulfill(status=404, body="{}")
+    pg3.route("https://test.supabase.co/**", supa2)
+    onboard(pg3, "Newphone"); pg3.fill("#o-base", "2200"); finish_onboarding(pg3)
+    pg3.goto(BASE + "#/settings"); pg3.click("summary")
+    pg3.fill("#c-url", "https://test.supabase.co"); pg3.fill("#c-key", "anon-key"); pg3.click("button[data-act='saveCfg']"); pg3.wait_for_timeout(200)
+    pg3.fill("#a-email", "jess@example.com"); pg3.fill("#a-pass", "secret123"); pg3.click("button[data-act='signIn']"); pg3.wait_for_timeout(600)
+    st3 = js(pg3, "window.__practice.store.settings()")
+    check("new phone sign-in: backed-up settings win over the welcome screens", st3["name"] == "Jessie" and st3["baseKcal"] == 1700 and st3["createdOn"] == "2026-10-01", f"{st3.get('name')} {st3.get('baseKcal')}")
+    ctx3.close()
+
+    # ---------------- 11b. Celebrations ----------------
+    ctx4, pg4 = new_page(browser, errors)
+    pg4.add_init_script("sessionStorage.setItem('fxTest','1'); localStorage.setItem('practice.celebrations','on')")
+    onboard(pg4, "Fx"); finish_onboarding(pg4)
+    pg4.goto(BASE + "#/today"); pg4.wait_for_selector("text=Today's practice")
+    for _ in range(4): pg4.click("button[data-act='water'][data-oz='24']"); pg4.wait_for_timeout(120)
+    pg4.wait_for_selector(".fx-banner", timeout=3000)
+    check("celebrate: water goal banner", "Water goal" in pg4.inner_text(".fx-banner"))
+    pg4.wait_for_timeout(3200)
+    js(pg4, f"(async()=>{{const P=window.__practice; P.rewards._touch(); await P.store.saveWorkout({{date:'{today}', type:'strength', title:'Strength', minutes:60}});}})()")
+    pg4.wait_for_selector(".fx-banner", timeout=3000)
+    check("celebrate: train ring banner", "Train ring closed" in pg4.inner_text(".fx-banner"))
+    pg4.wait_for_timeout(3200)
+    js(pg4, f"(async()=>{{const P=window.__practice; const t=P.store.targetsFor('{today}'); P.rewards._touch(); await P.db.put('foodLog', {{date:'{today}', meal:'dinner', name:'Test dinner', kcal:t.kcal, p:t.protein, c:100, f:40, fib:30, alc:0, at:new Date().toISOString()}});}})()")
+    pg4.wait_for_selector(".fx-overlay", timeout=3000)
+    check("celebrate: all rings overlay", "All rings closed" in pg4.inner_text(".fx-overlay"))
+    pg4.wait_for_timeout(1400)
+    check("celebrate: particles are flying", js(pg4, "window.__practice.fx.activeParticles()") > 20)
+    shot(pg4, "30_all_rings")
+    pg4.wait_for_timeout(1500)
+    pg4.click(".fx-overlay"); pg4.wait_for_timeout(500)
+    check("celebrate: tap closes the overlay", pg4.locator(".fx-overlay").count() == 0)
+    js(pg4, "window.__practice.rewards._touch(); window.__practice.rewards.evaluate()")
+    pg4.wait_for_timeout(400)
+    check("celebrate: all rings only once a day", pg4.locator(".fx-overlay").count() == 0)
+    # new personal best mid-workout
+    js(pg4, f"(async()=>{{await window.__practice.store.saveWorkout({{date: window.__practice.D.addDays('{today}',-2), type:'strength', title:'Lower', minutes:40, endedAt:'2026-01-01T00:00:00Z', exercises:[{{exId:'goblet-squat', sets:[{{lb:20, reps:10, done:true}}]}}]}});}})()")
+    js(pg4, f"(async()=>{{await window.__practice.store.startSession({{templateId:'lower-hips', date:'{today}', origDate:null}}); window.__practice.go('#/workout');}})()")
+    pg4.wait_for_selector("text=Finish workout")
+    pg4.fill(".set-in[data-i='0'][data-j='0'][data-k='lb']", "25")
+    pg4.click("button[data-act='toggleSet'][data-i='0'][data-j='0']")
+    pg4.wait_for_selector(".fx-banner", timeout=3000)
+    check("celebrate: new personal best", "New personal best" in pg4.inner_text(".fx-banner"))
+    pg4.wait_for_timeout(3200)
+    pg4.fill(".set-in[data-i='0'][data-j='1'][data-k='lb']", "30")
+    pg4.click("button[data-act='toggleSet'][data-i='0'][data-j='1']"); pg4.wait_for_timeout(500)
+    check("celebrate: best only once per exercise per workout", pg4.locator(".fx-banner").count() == 0)
+    # streak milestone overlay
+    js(pg4, "void window.__practice.fx.enqueue(()=>window.__practice.fx.streakMilestone(7,'A full week.'))")
+    pg4.wait_for_selector(".fx-flame", timeout=3000); pg4.wait_for_timeout(1500)
+    check("celebrate: streak milestone overlay", "7-day streak" in pg4.inner_text(".fx-overlay"))
+    shot(pg4, "31_streak")
+    pg4.click(".fx-overlay")
+    # switch off in settings
+    pg4.wait_for_timeout(500)
+    pg4.goto(BASE + "#/settings"); pg4.click("#s-fx"); pg4.wait_for_timeout(100)
+    check("celebrate: can be turned off", js(pg4, "window.__practice.fx.enabled()") is False)
+    ctx4.close()
+
     # restore into a brand new phone
     ctx2, pg2 = new_page(browser, errors)
     pg2.goto(BASE); pg2.wait_for_selector("#o-name")
@@ -580,7 +770,8 @@ with sync_playwright() as p:
 
     # ---------------- 12. Layout checks on every screen ----------------
     onboard(pg, "Lay"); finish_onboarding(pg)
-    for route in ["#/today", "#/train", "#/train/myweek", "#/train/history", "#/eat", "#/eat/recipes", "#/eat/plan", "#/add/lunch", "#/recipe/greek-chicken-bowls", "#/progress", "#/settings"]:
+    lay_lift = js(pg, "(()=>{const P=window.__practice; for (const k of [0,7]) for (const d of P.store.weekPlan(P.D.addDays(P.D.weekStart(P.D.today()),k)).days) for (const x of d.sessions) if (x.item.templateId) return x.ref; })()")
+    for route in [f"#/day/{today}", f"#/lift/{lay_lift}", "#/today", "#/train", "#/train/myweek", "#/train/history", "#/eat", "#/eat/recipes", "#/eat/plan", "#/add/lunch", "#/recipe/greek-chicken-bowls", "#/progress", "#/settings"]:
         pg.goto(BASE + route); pg.wait_for_timeout(250)
         overflow = js(pg, "document.documentElement.scrollWidth > window.innerWidth + 1")
         check(f"layout: no horizontal overflow on {route}", not overflow)

@@ -6,23 +6,42 @@ import { satisfies } from '../plan.js';
 import { icon, esc, fmt, ringsSvg, toast } from '../ui.js';
 import { refresh, go } from '../main.js';
 import { openRunSheet, startTemplate, openEditWorkout } from './quicklog.js';
+import { startRef } from './day.js';
+
+function extraRows(p, date) {
+  if (!p.extras?.length) return '';
+  const cur = store.currentSession();
+  return p.extras.map((x) => {
+    const lift = x.item.kind !== 'run';
+    if (x.workout) return `<div class="wk" style="margin-top:10px"><div><b>${icon('check', 16, '#7FD3A8', 2.6)} Done: ${esc(x.workout.title)}</b><span>${x.workout.distanceMi ? `${x.workout.distanceMi} mi · ` : ''}${fmt(x.workout.minutes)} min</span></div>
+      <button class="btn soft small" data-act="editW" data-id="${x.workout.id}">Edit</button></div>`;
+    return `<div class="wk" style="margin-top:10px"><div class="grow"><b>+ ${esc(x.item.title.replace(/^Strength: /, 'Lift: '))}</b><span>${esc(x.item.detail || '')}</span></div>
+      ${lift ? `<a class="btn soft small" href="#/lift/${x.ref}">Moves</a>` : ''}<button class="btn coral small" data-act="startRef" data-ref="${x.ref}">${icon('play', 11, '#fff')}${cur?.ref === x.ref ? 'Resume' : 'Start'}</button></div>`;
+  }).join('');
+}
 
 function workoutCard(p, date) {
+  return mainCard(p, date) + extraRows(p, date) + `<div style="margin-top:10px"><a class="link-btn" style="color:#C9D0DD" href="#/day/${date}">${icon('plus', 15, '#C9D0DD')}Add a workout to today</a></div>`;
+}
+
+function mainCard(p, date) {
   const it = p.item;
   if (p.done) {
     const w = p.workouts.find((x) => satisfies(x, it)) || p.workouts[0];
     return `<div class="wk"><div><b>${icon('check', 16, '#7FD3A8', 2.6)} Done: ${esc(w.title)}</b><span>${w.distanceMi ? `${w.distanceMi} mi · ` : ''}${fmt(w.minutes)} min</span></div>
       <button class="btn soft small" data-act="editW" data-id="${w.id}">Edit</button></div>`;
   }
+  if (it.kind === 'rest' && p.extras?.length) return '';
   if (it.kind === 'rest') {
     return `<div class="wk"><div><b>Rest day</b><span>Optional: 15 min hip mobility</span></div><button class="btn coral small" data-act="startMob">${icon('play', 12, '#fff')}Mobility</button></div>`;
   }
   if (p.status === 'skipped') return `<div class="wk"><div><b class="strike" style="color:#C9D0DD">${esc(it.title)}</b><span>Skipped</span></div><a class="btn soft small" href="#/change/${p.origDate}">Undo</a></div>`;
   const session = store.currentSession();
-  const startLabel = session && session.date === date ? 'Resume' : 'Start';
+  const startLabel = session && session.date === date && (!session.ref || session.ref === p.sessions[0].ref) ? 'Resume' : 'Start';
+  const lift = it.kind !== 'run';
   return `<div class="wk"><div class="grow"><b>${esc(it.title)}</b><span>${esc(it.detail)}</span></div>
     <button class="btn coral" data-act="start">${icon('play', 12, '#fff')}${startLabel}</button></div>
-    <div style="margin-top:10px"><a class="link-btn" style="color:#C9D0DD" href="#/change/${p.origDate}">${icon('swap', 15, '#C9D0DD')}Move, swap or skip</a></div>`;
+    <div class="row" style="margin-top:10px;gap:16px;flex-wrap:wrap">${lift ? `<a class="link-btn" style="color:#C9D0DD" href="#/lift/${p.sessions[0].ref}">${icon('list', 15, '#C9D0DD')}See & edit moves</a>` : ''}<a class="link-btn" style="color:#C9D0DD" href="#/change/${p.origDate}">${icon('swap', 15, '#C9D0DD')}Move, swap or skip</a></div>`;
 }
 
 function mealRows(date) {
@@ -64,7 +83,7 @@ export default {
     const energy = store.energyFor(date);
     const song = songFor(date); const links = songLinks(song);
     const left = t.kcal - totals.kcal;
-    const rest = p.item.kind === 'rest' && !mins;
+    const rest = p.item.kind === 'rest' && !mins && !p.extras?.length;
     const rings = ringsSvg([
       { frac: rest ? 1 : mins / t.trainMin, color: '#E4572E', track: '#FBE3DC' },
       { frac: totals.kcal / t.kcal, color: '#2F5BD8', track: '#DCE4FA' },
@@ -111,9 +130,9 @@ export default {
   actions: {
     start: () => {
       const date = D.today(); const p = store.planFor(date);
-      if (p.item.kind === 'run') openRunSheet({ date, item: p.item, origDate: p.origDate });
-      else startTemplate(p.item.templateId, date, p.origDate);
+      startRef(p.sessions[0].ref);
     },
+    startRef: (el) => startRef(el.dataset.ref),
     startMob: () => startTemplate('hip-mobility', D.today(), null),
     editW: (el) => { const w = window.__practice.db.get('workouts', el.dataset.id); if (w) openEditWorkout(w); },
     water: async (el) => { await store.addWater(D.today(), Number(el.dataset.oz)); refresh(); },

@@ -17,6 +17,7 @@ const LIGHTER = 0.75;     // every 4th week
 export const DEFAULT_PLAN_SETTINGS = {
   availableDays: [true, true, true, true, true, true, true],
   longRunDay: 5, // Saturday
+  doubleDays: [false, false, false, false, false, false, false], // days she has time to run AND lift
   weekdayMinutes: 60,
   startMiles: 10,
   easyPace: 11, // min per mile
@@ -81,6 +82,34 @@ function raceVolume(s, o, wkStart, idx, race, skippedLongWeeks) {
 
 // ---------------- Weekly layout ----------------
 
+const RUN_KINDS = new Set(['long', 'quality', 'easy']);
+const LEGS = new Set(['lower-hips', 'full-body']);
+
+/**
+ * On her "run + lift" days the coach adds a second session: a lift on a run day, or an easy run on a
+ * lift day. Heavy legs never go on the long-run day, the day before it, or next to another leg day, and
+ * the coach prefers a lift the week doesn't already have. Returns an array of 7 kinds (or null).
+ */
+export function doubleSlots(assign, doubleDays, longDay) {
+  const out = Array(7).fill(null);
+  const have = new Set(assign.filter(Boolean));
+  for (let d = 0; d < 7; d++) {
+    const k = assign[d];
+    if (!doubleDays[d] || !k) continue;
+    if (RUN_KINDS.has(k)) {
+      const nearLong = k === 'long' || d === longDay || d === longDay - 1;
+      const legsNear = [assign[d - 1], assign[d + 1], out[d - 1]].some((x) => LEGS.has(x));
+      const ok = (t) => !(LEGS.has(t) && (nearLong || legsNear));
+      const fresh = ['lower-hips', 'upper-core', 'full-body'].find((t) => ok(t) && !have.has(t));
+      const pick = fresh || 'upper-core';
+      out[d] = pick; have.add(pick);
+    } else {
+      out[d] = 'easy';
+    }
+  }
+  return out;
+}
+
 const HARD = new Set(['long', 'quality', 'lower-hips']);
 
 /** Penalty for putting `kind` on day d given the current assignment (array of kinds or null). */
@@ -140,7 +169,8 @@ export function itemFor(kind, vol, opts) {
   const nRuns = vol._runs || 3;
   const longMi = Math.min(vol.longCap, Math.max(3, r05(vol.miles * (nRuns === 1 ? 1 : runs.long))));
   const qualMi = Math.max(2, r05(vol.miles * runs.quality));
-  const easyMi = Math.max(2, r05(vol.miles - longMi - (nRuns >= 3 ? qualMi : 0)));
+  const nEasy = Math.max(1, vol._easy || 1);
+  const easyMi = Math.max(2, r05((vol.miles - longMi - (nRuns >= 3 ? qualMi : 0)) / nEasy));
   switch (kind) {
     case 'long': return run('long', longMi, pace + 0.5);
     case 'quality': return vol.lighter || vol.phase === 'taper'
@@ -157,6 +187,7 @@ function run(type, mi, pace) {
   const t = RUN_TYPES[type];
   return { kind: 'run', runType: type, miles: mi, title: t.title, detail: t.describe(mi), minutes: Math.round(mi * pace), why: t.why };
 }
+export function templateItem(id, opts = {}) { return tmpl(id, opts); }
 function tmpl(id, opts) {
   const t = TEMPLATES[id];
   const minutes = Math.min(t.minutes, opts.weekdayMinutes || 60);
@@ -172,16 +203,25 @@ export function baseWeek(s, wkStart, skippedLongWeeks) {
   const vol = weekVolume(s, wkStart, skippedLongWeeks);
   const avail = o.availableDays.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
   const kinds = kindsFor(avail.length, vol.lighter);
-  vol._runs = kinds.filter((k) => ['long', 'quality', 'easy'].includes(k)).length;
-  const { assign } = allocate(kinds, avail, o.longRunDay);
+  const { assign, longDay } = allocate(kinds, avail, o.longRunDay);
+  const doubles = doubleSlots(assign, (o.doubleDays || []).map((v, i) => v && o.availableDays[i]), longDay ?? o.longRunDay);
+  const runKinds = [...assign, ...doubles].filter((k) => RUN_KINDS.has(k));
+  vol._runs = runKinds.length;
+  vol._easy = runKinds.filter((k) => k === 'easy').length;
   const days = D.range(wkStart, 7).map((date, i) => {
     const slot = assign[i];
-    return { date, slot, item: slot ? itemFor(slot, vol, o) : itemFor('rest', vol, o) };
+    const day = { date, slot, item: slot ? itemFor(slot, vol, o) : itemFor('rest', vol, o) };
+    if (doubles[i]) {
+      const x = itemFor(doubles[i], vol, o);
+      const pair = RUN_KINDS.has(slot) ? 'Run first, then lift' : 'Lift first or run first, whatever fits your day';
+      day.double = { slot: doubles[i], item: { ...x, why: `${pair}, or split them morning and evening. ${x.why}` } };
+    }
+    return day;
   });
   // Race day replaces whatever is on the race date.
   if (vol.race && vol.phase === 'race') {
     const rd = days.find((d) => d.date === vol.race.date);
-    if (rd) { const R = RACE_DISTANCES[vol.race.distance]; rd.slot = 'race'; rd.item = { kind: 'run', runType: 'race', title: `Race day: ${vol.race.name || R.label}`, detail: 'Trust your training. Start easy.', minutes: 0, miles: 0, why: 'This is what all the practice was for.' }; }
+    if (rd) { const R = RACE_DISTANCES[vol.race.distance]; rd.slot = 'race'; rd.double = null; rd.item = { kind: 'run', runType: 'race', title: `Race day: ${vol.race.name || R.label}`, detail: 'Trust your training. Start easy.', minutes: 0, miles: 0, why: 'This is what all the practice was for.' }; }
     // easy shake-out the rest of the week is fine as generated (taper volume)
   }
   return { vol, days };
@@ -230,6 +270,7 @@ export function applyEdits(week, edits) {
   for (const e of mine) {
     const d = byDate[e.id]; if (!d) continue;
     if (e.replacement) { d.item = { ...e.replacement }; d.edited = 'swap'; }
+    if (e.custom) d.item = { ...d.item, exercises: e.custom, customized: true };
     if (e.action === 'skip') d.status = 'skipped';
   }
   for (const e of mine.filter((x) => x.action === 'move' && x.toDate && wk.has(x.toDate))) {
