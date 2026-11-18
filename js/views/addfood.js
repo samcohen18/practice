@@ -22,17 +22,17 @@ function resultRow(r) {
     const kcal = Math.round(n.kcal * reg / 100);
     return `<div class="list-row"><button class="grow" style="background:none;border:none;text-align:left;padding:0" data-act="food" data-id="${esc(f.id)}">
       <span class="name" style="display:block">${esc(f.name)}</span><span class="meta">${f.custom ? 'Your food · ' : ''}Regular ${reg >= 28 ? `${fmt(reg / 28.35, 1)} oz` : `${fmt(reg)} g`} · ${fmt(Math.round(n.p * reg / 100))} g protein</span></button>
-      <b style="font-size:14px">${fmt(kcal)} cal</b><button class="circle-btn" data-act="food" data-id="${esc(f.id)}" aria-label="Add ${esc(f.name)}">${icon('plus', 15, '#14213D', 2.4)}</button></div>`;
+      <b style="font-size:14px">${fmt(kcal)} cal</b><button class="circle-btn" data-act="food" data-id="${esc(f.id)}" aria-label="Add ${esc(f.name)}">${icon('plus', 15, 'var(--ink)', 2.4)}</button></div>`;
   }
   if (r.kind === 'recipe') {
     const rc = r.recipe;
     return `<div class="list-row"><button class="grow" style="background:none;border:none;text-align:left;padding:0" data-act="recipe" data-id="${rc.id}">
       <span class="name" style="display:block">${esc(rc.name)}</span><span class="meta">Recipe · 1 serving · ${rc.perServing.p} g protein</span></button>
-      <b style="font-size:14px">${fmt(rc.perServing.kcal)} cal</b><button class="circle-btn" data-act="recipe" data-id="${rc.id}" aria-label="Add ${esc(rc.name)}">${icon('plus', 15, '#14213D', 2.4)}</button></div>`;
+      <b style="font-size:14px">${fmt(rc.perServing.kcal)} cal</b><button class="circle-btn" data-act="recipe" data-id="${rc.id}" aria-label="Add ${esc(rc.name)}">${icon('plus', 15, 'var(--ink)', 2.4)}</button></div>`;
   }
   const g = r.goTo; const n = goToTotals(g);
   return `<div class="list-row"><span class="grow"><span class="name" style="display:block">${esc(g.name)}</span><span class="meta">Your go-to · ${fmt(n.p)} g protein</span></span>
-    <b style="font-size:14px">${fmt(n.kcal)} cal</b><button class="circle-btn" data-act="goTo" data-id="${g.id}" aria-label="Add ${esc(g.name)}">${icon('plus', 15, '#14213D', 2.4)}</button></div>`;
+    <b style="font-size:14px">${fmt(n.kcal)} cal</b><button class="circle-btn" data-act="goTo" data-id="${g.id}" aria-label="Add ${esc(g.name)}">${icon('plus', 15, 'var(--ink)', 2.4)}</button></div>`;
 }
 
 function goToTotals(g) {
@@ -60,7 +60,7 @@ function resultsHtml(meal) {
         : q.trim() ? `<div class="card muted">Nothing saved matches “${esc(q.trim())}”.</div>` : ''}
       ${onlineBlock()}
       ${!q.trim() && !drinks ? `<section><div class="eyebrow" style="margin-bottom:8px">Your go-tos · one tap</div>
-        <div class="chips">${goTos.map((g) => `<button class="chip" data-act="goTo" data-id="${g.id}">${icon('plus', 14, '#14213D', 2.4)}${esc(g.name)}</button>`).join('')}</div></section>
+        <div class="chips">${goTos.map((g) => `<button class="chip" data-act="goTo" data-id="${g.id}">${icon('plus', 14, 'var(--ink)', 2.4)}${esc(g.name)}</button>`).join('')}</div></section>
         ${recents.length ? `<section class="card" style="padding-bottom:6px"><div class="eyebrow" style="padding-bottom:6px">Recent</div>${recents.map((e) => {
           if (e.foodId) { const f = store.foodById(e.foodId); return f ? resultRow({ kind: 'food', food: f }) : ''; }
           if (e.recipeId) return resultRow({ kind: 'recipe', recipe: RECIPE_BY_ID[e.recipeId] });
@@ -76,9 +76,9 @@ export default {
     const drinks = meal === 'drinks';
     return `<main class="screen no-tabs">
       <div class="row between"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em">Add to ${MEAL_LABEL[meal] || meal}</h1>
-        <a class="round-btn" href="#/eat" aria-label="Close">${icon('close', 18, '#14213D', 2.4)}</a></div>
+        <a class="round-btn" href="#/eat" aria-label="Close">${icon('close', 18, 'var(--ink)', 2.4)}</a></div>
       ${ctx.date !== D.today() ? `<div class="muted">For ${D.fmtLong(ctx.date)}</div>` : ''}
-      <div class="row"><label class="search grow">${icon('search', 18, '#5B6475')}<input id="food-q" type="search" aria-label="Search foods" placeholder="${drinks ? 'Search drinks' : 'Search foods and recipes'}" value="${esc(q)}" data-input="q" autocomplete="off"></label>
+      <div class="row"><label class="search grow">${icon('search', 18, 'var(--grey)')}<input id="food-q" type="search" aria-label="Search foods" placeholder="${drinks ? 'Search drinks' : 'Search foods and recipes'}" value="${esc(q)}" data-input="q" autocomplete="off"></label>
         <button class="round-btn" style="width:48px;height:48px;border-radius:14px" data-act="barcode" aria-label="Look up a barcode">${icon('barcode', 20)}</button></div>
       <div id="food-results" style="display:flex;flex-direction:column;gap:14px">${resultsHtml(meal)}</div>
       <div class="grid2"><button class="btn line" data-act="custom">${icon('edit', 15)}Create a food</button><button class="btn line" data-act="quickAdd">${icon('plus', 15)}Quick calories</button></div>

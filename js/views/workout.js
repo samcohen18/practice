@@ -49,11 +49,11 @@ function exerciseCard(sess, i) {
       <h2 style="font-size:22px;font-weight:800;letter-spacing:-0.01em;margin-top:4px">${esc(ex.name)}</h2>
       <div class="muted" style="margin-top:3px">${target}${last ? ` · last time ${setLabel(ex, last.sets[0])}` : ''}</div></div>
       <button class="btn soft small" data-act="swapEx" data-i="${i}">${icon('swap', 14)}Swap</button></div>
-    <div class="cue">${esc(ex.cue)}${ex.hip === 'friendly' ? ' <b style="color:#1F7A52">Hip-friendly.</b>' : ex.hip === 'caution' ? ' <b style="color:#C94420">Go easy if your hip flexor or groin is sore.</b>' : ''}</div>
+    <div class="cue">${esc(ex.cue)}${ex.hip === 'friendly' ? ' <b style="color:var(--green-tx)">Hip-friendly.</b>' : ex.hip === 'caution' ? ' <b style="color:var(--coral-tx)">Go easy if your hip flexor or groin is sore.</b>' : ''}</div>
     ${head}${rows}
-    <div class="row between"><span class="pill" style="background:${newBest ? '#FCEFD3' : '#F1F2F5'};color:${newBest ? '#8A5A00' : '#5B6475'}">${icon('flag', 13, newBest ? '#8A5A00' : '#5B6475')}${esc(bestTxt)}</span>
-      <span class="row" style="gap:14px">${e.sets.length > 1 && !e.sets[e.sets.length - 1].done ? `<button class="link-btn" style="color:#5B6475" data-act="rmSet" data-i="${i}">− Set</button>` : ''}<button class="link-btn" data-act="addSet" data-i="${i}">+ Add set</button></span></div>
-    ${sess.exercises.length > 1 ? `<button class="link-btn" style="align-self:flex-start;color:#B3261E;font-size:13px" data-act="rmEx" data-i="${i}">${icon('trash', 13, '#B3261E')}Remove from this workout</button>` : ''}</section>`;
+    <div class="row between"><span class="pill" style="background:${newBest ? 'var(--gold-t)' : 'var(--chip)'};color:${newBest ? 'var(--gold-tx)' : 'var(--grey)'}">${icon('flag', 13, newBest ? 'var(--gold-tx)' : 'var(--grey)')}${esc(bestTxt)}</span>
+      <span class="row" style="gap:14px;white-space:nowrap;flex:none">${e.sets.length > 1 && !e.sets[e.sets.length - 1].done ? `<button class="link-btn" style="color:var(--grey)" data-act="rmSet" data-i="${i}">− Set</button>` : ''}<button class="link-btn" style="white-space:nowrap" data-act="addSet" data-i="${i}">+ Add set</button></span></div>
+    ${sess.exercises.length > 1 ? `<button class="link-btn" style="align-self:flex-start;color:var(--red-tx);font-size:13px" data-act="rmEx" data-i="${i}">${icon('trash', 13, 'var(--red-tx)')}Remove from this workout</button>` : ''}</section>`;
 }
 
 function restBar(sess) {
@@ -89,7 +89,7 @@ export default {
     return `<main class="screen no-tabs">
       <div class="topbar"><a class="round-btn" href="#/today" aria-label="Back to Today (workout keeps running)">${icon('back', 20)}</a>
         <div class="t"><b>${esc(sess.title)}</b><span>Exercise ${cur + 1} of ${sess.exercises.length}</span></div>
-        <span class="pill" style="background:#fff;font-size:13px;font-variant-numeric:tabular-nums">${icon('timer', 15, '#C94420')}<span id="elapsed">${mmss(elapsed(sess))}</span></span></div>
+        <span class="pill" style="background:var(--card);font-size:13px;font-variant-numeric:tabular-nums">${icon('timer', 15, 'var(--coral-tx)')}<span id="elapsed">${mmss(elapsed(sess))}</span></span></div>
       <div class="progress-line" role="progressbar" aria-valuenow="${doneSets}" aria-valuemax="${totalSets}" aria-label="Sets done"><i style="width:${(doneSets / Math.max(1, totalSets)) * 100}%"></i></div>
       ${cur === 0 && !doneSets ? warm : ''}
       ${exerciseCard(sess, cur)}
@@ -97,11 +97,11 @@ export default {
       <div class="row"><button class="btn line grow" data-act="go" data-i="${cur - 1}" ${cur === 0 ? 'disabled' : ''}>${icon('back', 16)}Previous</button>
         <button class="btn grow" data-act="go" data-i="${cur + 1}" ${cur === sess.exercises.length - 1 ? 'disabled' : ''}>Next${icon('chev', 16, '#fff')}</button></div>
       <section class="card" style="padding-bottom:6px"><h2 style="font-size:16px;margin-bottom:6px">All exercises</h2>
-        ${others.map(({ e, i }) => { const ex = EX_BY_ID[e.exId]; const n = e.sets.filter((s) => s.done).length; return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="go" data-i="${i}">
-          <span style="width:28px;height:28px;border-radius:14px;background:${n === e.sets.length ? '#1F7A52' : '#F1F2F5'};color:${n === e.sets.length ? '#fff' : '#14213D'};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">${n === e.sets.length ? icon('check', 14, '#fff', 2.6) : i + 1}</span>
+        ${others.map(({ e, i }) => { const ex = EX_BY_ID[e.exId]; const n = e.sets.filter((s) => s.done).length; return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="go" data-i="${i}">
+          <span style="width:28px;height:28px;border-radius:14px;background:${n === e.sets.length ? '#1F7A52' : 'var(--chip)'};color:${n === e.sets.length ? '#fff' : 'var(--ink)'};font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">${n === e.sets.length ? icon('check', 14, '#fff', 2.6) : i + 1}</span>
           <span class="grow"><span class="name" style="display:block">${esc(ex.name)}</span><span class="meta">${n} of ${e.sets.length} sets</span></span></button>`; }).join('')}</section>
       <button class="btn ghost block" data-act="addEx">${icon('plus', 16)}Add an exercise</button>
-      <button class="link-btn" style="align-self:center;color:#B3261E" data-act="discard">Discard workout</button>
+      <button class="link-btn" style="align-self:center;color:var(--red-tx)" data-act="discard">Discard workout</button>
       <div class="bottom-cta"><div><button class="btn block" data-act="finish">Finish workout</button></div></div>
     </main>`;
   },
@@ -133,6 +133,7 @@ export default {
       const exercises = structuredClone(sess.exercises);
       const s = exercises[i].sets[j];
       s.done = !s.done;
+      if (s.done) fx.haptic();
       // new personal best? celebrate once per exercise per workout
       const exId = exercises[i].exId; const prior = store.bestSet(exId);
       const shown = sess.prShown || [];
@@ -165,8 +166,8 @@ export default {
         label: 'Swap exercise',
         render: () => `<div class="sheet-hd"><h2>Swap ${esc(EX_BY_ID[e.exId].name)}</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
           <p class="note">These work the same muscles, so the workout keeps its purpose.</p>
-          <div class="card" style="padding:4px 16px">${opts.length ? opts.map((o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="pickEx" data-id="${o.id}">
-            <span class="grow"><span class="name" style="display:block">${esc(o.name)}</span><span class="meta">${o.equip === 'dumbbell' ? 'Dumbbells' : 'No equipment'}${o.hip === 'friendly' ? ' · hip-friendly' : o.hip === 'caution' ? ' · careful with hips' : ''}</span></span>${icon('chev', 16, '#6B7385')}</button>`).join('') : '<p class="note" style="padding:12px 0">No swaps for this one.</p>'}</div>
+          <div class="card" style="padding:4px 16px">${opts.length ? opts.map((o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="pickEx" data-id="${o.id}">
+            <span class="grow"><span class="name" style="display:block">${esc(o.name)}</span><span class="meta">${o.equip === 'dumbbell' ? 'Dumbbells' : 'No equipment'}${o.hip === 'friendly' ? ' · hip-friendly' : o.hip === 'caution' ? ' · careful with hips' : ''}</span></span>${icon('chev', 16, 'var(--grey-2)')}</button>`).join('') : '<p class="note" style="padding:12px 0">No swaps for this one.</p>'}</div>
           <button class="btn ghost block" data-act="allEx">${icon('search', 15)}Pick any exercise</button>`,
         actions: {
           close: () => closeSheet(),

@@ -18,10 +18,10 @@ function blockCard(vol) {
     const phases = ['base', 'build', 'peak', 'taper'];
     const idx = vol.phase === 'race' ? 3 : phases.indexOf(vol.phase);
     return `<section class="card" style="display:flex;flex-direction:column;gap:12px">
-      <div class="row between"><span class="eyebrow">${esc(vol.race.name || R.label)}</span><span class="pill">${icon('flag', 13, '#C94420')}${D.fmtShort(vol.race.date)}</span></div>
-      <div class="row" style="align-items:baseline;gap:8px"><span class="big-num">${vol.weeksLeft}</span><span style="font-size:16px;font-weight:700;color:#5B6475">week${vol.weeksLeft === 1 ? '' : 's'} to race day</span></div>
+      <div class="row between"><span class="eyebrow">${esc(vol.race.name || R.label)}</span><span class="pill">${icon('flag', 13, 'var(--coral-tx)')}${D.fmtShort(vol.race.date)}</span></div>
+      <div class="row" style="align-items:baseline;gap:8px"><span class="big-num">${vol.weeksLeft}</span><span style="font-size:16px;font-weight:700;color:var(--grey)">week${vol.weeksLeft === 1 ? '' : 's'} to race day</span></div>
       <div class="phase-bar">${['Base', 'Build', 'Peak', 'Taper'].map((n, i) => `<div class="${i <= idx ? 'on' : ''} ${i === idx ? 'cur' : ''}"><i></i><span>${n}</span></div>`).join('')}</div>
-      <p class="note"><b style="color:#14213D">${esc(vol.label)}.</b> This week: ${fmt(vol.miles, 1)} miles${vol.lighter ? ', a lighter week so your body can catch up' : ''}.</p>
+      <p class="note"><b style="color:var(--ink)">${esc(vol.label)}.</b> This week: ${fmt(vol.miles, 1)} miles${vol.lighter ? ', a lighter week so your body can catch up' : ''}.</p>
       <a class="link-btn" href="#/train/myweek">${icon('edit', 15)}Change race</a></section>`;
   }
   const wk = vol.weekInBlock;
@@ -29,8 +29,8 @@ function blockCard(vol) {
     <div class="row between"><span class="eyebrow">Current block</span><span class="pill">Block ${vol.block}</span></div>
     <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.1">${esc(vol.label)}</div>
     <div class="phase-bar">${['Week 1', 'Week 2', 'Week 3', 'Lighter week'].map((n, i) => `<div class="${i < wk ? 'on' : ''} ${i === wk - 1 ? 'cur' : ''}"><i></i><span>${n}</span></div>`).join('')}</div>
-    <p class="note"><b style="color:#14213D">Week ${wk} of 4.</b> ${vol.lighter ? `Lighter week: ${fmt(vol.miles, 1)} miles so your body can catch up.` : `Easy miles, strength and hip work. This week: ${fmt(vol.miles, 1)} miles.${wk === 3 ? ' Next week is lighter.' : ''}`}</p>
-    <a class="row between" href="#/train/myweek" style="border-top:1px solid #E6E8EC;padding-top:12px;font-size:14px;font-weight:700"><span class="row" style="gap:8px">${icon('flag', 16, '#C94420')}Training for a race? Add it</span>${icon('chev', 18, '#6B7385')}</a></section>`;
+    <p class="note"><b style="color:var(--ink)">Week ${wk} of 4.</b> ${vol.lighter ? `Lighter week: ${fmt(vol.miles, 1)} miles so your body can catch up.` : `Easy miles, strength and hip work. This week: ${fmt(vol.miles, 1)} miles.${wk === 3 ? ' Next week is lighter.' : ''}`}</p>
+    <a class="row between" href="#/train/myweek" style="border-top:1px solid var(--line);padding-top:12px;font-size:14px;font-weight:700"><span class="row" style="gap:8px">${icon('flag', 16, 'var(--coral-tx)')}Training for a race? Add it</span>${icon('chev', 18, 'var(--grey-2)')}</a></section>`;
 }
 
 function dayRow(d, today) {
@@ -78,10 +78,10 @@ function thisWeek() {
   return `${blockCard(vol)}
     <section class="card" style="padding:12px 8px">
       <div class="row between" style="padding:4px 8px 8px"><div class="row" style="gap:6px">
-        <button class="round-btn" style="width:32px;height:32px;box-shadow:none;background:#F1F2F5" data-act="wk" data-d="-7" aria-label="Previous week">${icon('back', 16)}</button>
+        <button class="round-btn" style="width:32px;height:32px;box-shadow:none;background:var(--chip)" data-act="wk" data-d="-7" aria-label="Previous week">${icon('back', 16)}</button>
         <h2 style="font-size:17px;font-weight:800">${isCurrent ? 'This week' : `Week of ${D.fmtShort(wk)}`}</h2>
-        <button class="round-btn" style="width:32px;height:32px;box-shadow:none;background:#F1F2F5" data-act="wk" data-d="7" aria-label="Next week">${icon('chev', 16)}</button></div>
-        <span class="pill" style="background:#E3F2EA;color:#1F7A52">${done} of ${planned.length} done</span></div>
+        <button class="round-btn" style="width:32px;height:32px;box-shadow:none;background:var(--chip)" data-act="wk" data-d="7" aria-label="Next week">${icon('chev', 16)}</button></div>
+        <span class="pill" style="background:var(--green-t);color:var(--green-tx)">${done} of ${planned.length} done</span></div>
       ${days.map((d) => dayRow(d, today)).join('')}
       <div class="muted small" style="padding:8px 12px 0">Tap a day to see its exercises, edit the moves or add a workout.</div>
       <div class="muted small" style="padding:8px 12px 2px">Running: ${fmt(milesDone, 1)} of ${fmt(vol.miles, 1)} mi</div>
@@ -127,9 +127,9 @@ function history() {
   return Object.entries(groups).map(([wk, list]) => {
     const mi = list.filter((w) => w.type === 'run').reduce((s, w) => s + (w.distanceMi || 0), 0);
     return `<section class="card" style="padding-bottom:6px"><div class="card-hd"><h2>Week of ${D.fmtShort(wk)}</h2><span class="muted">${list.length} workouts${mi ? ` · ${fmt(mi, 1)} mi` : ''}</span></div>
-      ${list.map((w) => { const col = typeColor(w.type); return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="editW" data-id="${w.id}">
+      ${list.map((w) => { const col = typeColor(w.type); return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="editW" data-id="${w.id}">
         <span class="type-dot" style="background:${col.t}"><i style="background:${col.c}"></i></span><span class="grow"><span class="name" style="display:block">${esc(w.title)}</span>
-        <span class="meta">${D.fmtShort(w.date)} · ${[w.distanceMi ? `${w.distanceMi} mi` : '', `${fmt(w.minutes)} min`, `${fmt(C.creditedKcal(w))} cal`, w.exercises ? `${w.exercises.length} exercises` : ''].filter(Boolean).join(' · ')}</span></span>${icon('chev', 16, '#6B7385')}</button>`; }).join('')}</section>`;
+        <span class="meta">${D.fmtShort(w.date)} · ${[w.distanceMi ? `${w.distanceMi} mi` : '', `${fmt(w.minutes)} min`, `${fmt(C.creditedKcal(w))} cal`, w.exercises ? `${w.exercises.length} exercises` : ''].filter(Boolean).join(' · ')}</span></span>${icon('chev', 16, 'var(--grey-2)')}</button>`; }).join('')}</section>`;
   }).join('');
 }
 

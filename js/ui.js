@@ -38,7 +38,8 @@ const P = {
 };
 
 export function icon(name, size = 20, color = 'currentColor', sw = 2) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
+  const style = color && color !== 'currentColor' ? ` style="color:${color}"` : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor"${style} stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
 }
 
 /** Concentric progress rings. rings: [{frac, color, track}] outer to inner. */
@@ -56,8 +57,8 @@ export function ringsSvg(rings, size = 132, label = '') {
 }
 
 export const TYPE_COLORS = {
-  run: { c: '#2F5BD8', t: '#DCE4FA' }, strength: { c: '#C94420', t: '#FBE3DC' }, bodyweight: { c: '#6D4FC2', t: '#EEE9FA' },
-  mobility: { c: '#1F7A52', t: '#E3F2EA' }, rest: { c: '#5B6475', t: '#EEF0F3' }, walk: { c: '#2F5BD8', t: '#DCE4FA' },
+  run: { c: 'var(--blue-tx)', t: 'var(--blue-t)' }, strength: { c: 'var(--coral-tx)', t: 'var(--coral-t)' }, bodyweight: { c: 'var(--purple-tx)', t: 'var(--purple-t)' },
+  mobility: { c: 'var(--green-tx)', t: 'var(--green-t)' }, rest: { c: 'var(--grey)', t: 'var(--grey-t)' }, walk: { c: 'var(--blue-tx)', t: 'var(--blue-t)' },
 };
 export const typeColor = (t) => TYPE_COLORS[t] || TYPE_COLORS.rest;
 
@@ -77,7 +78,7 @@ export function toast(msg, { undo, ms = 3200 } = {}) {
 // ---------------- sheets ----------------
 let sheetState = null; // { render, actions, onClose }
 export function openSheet({ render, actions = {}, onClose, label = 'Dialog' }) {
-  closeSheet(true);
+  closeSheet(true, true);
   const wrap = document.createElement('div');
   wrap.className = 'sheet-wrap';
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(label)}"></div>`;
@@ -97,11 +98,17 @@ export function refreshSheet() {
   el.scrollTop = st;
   if (focusedId) { const f = el.querySelector('#' + CSS.escape(focusedId)); if (f) { f.focus(); if (f.setSelectionRange && typeof f.value === 'string') f.setSelectionRange(f.value.length, f.value.length); } }
 }
-export function closeSheet(silent = false) {
+export function closeSheet(silent = false, instant = false) {
   if (!sheetState) return;
   const { wrap, onClose } = sheetState;
   sheetState = null;
-  wrap.remove();
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (instant || reduce) wrap.remove();
+  else {
+    // slide down and fade; the leaving sheet is renamed so nothing can find or tap it
+    wrap.classList.add('closing'); wrap.querySelector('.sheet')?.classList.replace('sheet', 'sheet-leaving');
+    setTimeout(() => wrap.remove(), 170);
+  }
   document.body.style.overflow = '';
   if (!silent && onClose) onClose();
 }
@@ -145,3 +152,15 @@ export function delegate(root, getHandlers) {
 
 export const num = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : NaN; };
 export const val = (sel, root = document) => root.querySelector(sel)?.value ?? '';
+
+// ---------------- theme ----------------
+export const themePref = () => { try { return localStorage.getItem('practice.theme') || 'auto'; } catch { return 'auto'; } };
+const darkMQ = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+export function applyTheme(pref = themePref()) {
+  const dark = pref === 'dark' || (pref === 'auto' && !!darkMQ?.matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.getElementById('theme-color')?.setAttribute('content', dark ? '#0C1322' : '#F4F5F7');
+  return dark;
+}
+export function setThemePref(pref) { try { localStorage.setItem('practice.theme', pref); } catch { /* ignore */ } applyTheme(pref); }
+darkMQ?.addEventListener?.('change', () => applyTheme());

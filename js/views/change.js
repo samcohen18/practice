@@ -46,9 +46,9 @@ export default {
           const trade = m.reasons.find((r) => r.startsWith('Trades'));
           const note = m.best ? `Coach pick${trade ? ` · ${trade.toLowerCase()}` : ''}` : m.reasons[0] || (m.date === D.today() ? 'Today' : 'Open');
           const warn = !m.best && m.reasons.length;
-          return `<button class="card" style="border:1.5px solid ${on ? '#14213D' : '#CDD2DA'};background:${on ? '#14213D' : '#fff'};color:${on ? '#fff' : '#14213D'};text-align:left;padding:10px 12px;box-shadow:none" data-act="pick" data-type="move" data-v="${m.date}" aria-pressed="${on}">
+          return `<button class="card" style="border:1.5px solid ${on ? 'var(--navy)' : 'var(--input-line)'};background:${on ? 'var(--navy)' : 'var(--card)'};color:${on ? '#fff' : 'var(--ink)'};text-align:left;padding:10px 12px;box-shadow:none" data-act="pick" data-type="move" data-v="${m.date}" aria-pressed="${on}">
             <span style="display:block;font-size:16px;font-weight:800">${D.DOW[D.dowIndex(m.date)]} ${D.parse(m.date).getDate()}</span>
-            <span style="display:block;font-size:11px;font-weight:700;line-height:1.3;margin-top:3px;color:${on ? '#C9D0DD' : m.best ? '#1F7A52' : warn ? '#C94420' : '#5B6475'}">${esc(note)}</span></button>`;
+            <span style="display:block;font-size:11px;font-weight:700;line-height:1.3;margin-top:3px;color:${on ? '#C9D0DD' : m.best ? 'var(--green-tx)' : warn ? 'var(--coral-tx)' : 'var(--grey)'}">${esc(note)}</span></button>`;
         }).join('')}</div>
         <p class="note" style="margin-top:8px">The coach recommends, you make the final pick.</p></section>
       ${swaps.length ? `<section class="card" style="padding-bottom:6px"><h2>Swap it</h2><div class="muted small" style="margin:2px 0 6px">Options that do the same job</div>
@@ -57,7 +57,7 @@ export default {
       <section class="card" style="display:flex;flex-direction:column;gap:8px"><h2>Can't this week</h2>
         <p class="note">${it.runType === 'long' ? 'Skip it and next week stays at this distance instead of going up. Nothing gets doubled up.' : 'Skip it and the rest of your week stays as planned. Nothing gets crammed in.'}</p>
         <button class="btn ${sel?.type === 'skip' ? '' : 'ghost'}" style="align-self:flex-start" data-act="pick" data-type="skip" data-v="1" aria-pressed="${sel?.type === 'skip'}">Skip this ${it.runType === 'long' ? 'long run' : 'workout'}</button></section>
-      <a class="card row between" href="#/train/myweek" style="font-size:14px;font-weight:700"><span><span style="display:block">New schedule?</span><span class="muted">Edit My week and the coach rebuilds from next week</span></span>${icon('chev', 18, '#6B7385')}</a>
+      <a class="card row between" href="#/train/myweek" style="font-size:14px;font-weight:700"><span><span style="display:block">New schedule?</span><span class="muted">Edit My week and the coach rebuilds from next week</span></span>${icon('chev', 18, 'var(--grey-2)')}</a>
       <div class="bottom-cta"><div><button class="btn block" data-act="save" ${sel ? '' : 'disabled'}>${esc(cta)}</button></div></div>
     </main>`;
   },

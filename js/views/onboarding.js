@@ -73,9 +73,9 @@ function stepHtml() {
   return `<h1>You're all set${f.name ? `, ${esc(f.name)}` : ''}!</h1>
     <p class="lead">Add the app to your home screen: tap Share, then <b>Add to Home Screen</b>. Always open it from there so your data stays in one place.</p>
     <div class="card" style="display:flex;flex-direction:column;gap:10px">
-      <div class="row">${icon('sun', 20, '#C94420')}<span><b>Today</b> shows your workout, rings and food at a glance.</span></div>
-      <div class="row">${icon('plus', 20, '#14213D')}<span>The <b>+</b> button logs food, workouts, drinks, water and weight.</span></div>
-      <div class="row">${icon('flame', 20, '#C94420')}<span>Your <b>daily streak</b> counts workouts and planned rest days.</span></div></div>`;
+      <div class="row">${icon('sun', 20, 'var(--coral-tx)')}<span><b>Today</b> shows your workout, rings and food at a glance.</span></div>
+      <div class="row">${icon('plus', 20, 'var(--ink)')}<span>The <b>+</b> button logs food, workouts, drinks, water and weight.</span></div>
+      <div class="row">${icon('flame', 20, 'var(--coral-tx)')}<span>Your <b>daily streak</b> counts workouts and planned rest days.</span></div></div>`;
 }
 
 export default {

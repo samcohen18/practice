@@ -23,14 +23,14 @@ function calendar() {
     const ws = store.workoutsFor(date);
     const t = date > D.today() ? null : ws[0]?.type;
     if (ws.length) count += ws.length;
-    const st = t ? `background:${typeColor(t === 'walk' ? 'run' : t === 'other' ? 'bodyweight' : t).c};color:#fff` : date > D.today() ? 'border:1px dashed #D3D7DE;color:#8A93A3' : 'background:#EEF0F3;color:#5B6475';
+    const st = t ? `background:${typeColor(t === 'walk' ? 'run' : t === 'other' ? 'bodyweight' : t).c};color:var(--on-accent)` : date > D.today() ? 'border:1px dashed var(--input-line);color:var(--grey-2)' : 'background:var(--grey-t);color:var(--grey)';
     cells += `<span class="d ${date === D.today() ? 'today' : ''}" style="${st}" aria-label="${D.fmtShort(date)}${ws.length ? ': ' + esc(ws.map((w) => w.title).join(', ')) : ''}">${i}</span>`;
   }
   const legend = [['Run', 'run'], ['Strength', 'strength'], ['Bodyweight', 'bodyweight'], ['Mobility', 'mobility']].map(([l, k]) => `<span><i style="background:${typeColor(k).c}"></i>${l}</span>`).join('');
   const nextOk = D.monthStart(D.addDays(m, 40)) <= D.monthStart(D.today());
   return `<section class="card" style="display:flex;flex-direction:column;gap:12px"><div class="row between">
-      <div class="row" style="gap:6px"><button class="round-btn" style="width:30px;height:30px;box-shadow:none;background:#F1F2F5" data-act="mo" data-d="-1" aria-label="Previous month">${icon('back', 14)}</button>
-      <h2>${D.monthName(m)}</h2>${nextOk ? `<button class="round-btn" style="width:30px;height:30px;box-shadow:none;background:#F1F2F5" data-act="mo" data-d="1" aria-label="Next month">${icon('chev', 14)}</button>` : ''}</div>
+      <div class="row" style="gap:6px"><button class="round-btn" style="width:30px;height:30px;box-shadow:none;background:var(--chip)" data-act="mo" data-d="-1" aria-label="Previous month">${icon('back', 14)}</button>
+      <h2>${D.monthName(m)}</h2>${nextOk ? `<button class="round-btn" style="width:30px;height:30px;box-shadow:none;background:var(--chip)" data-act="mo" data-d="1" aria-label="Next month">${icon('chev', 14)}</button>` : ''}</div>
       <span class="muted">${count} workout${count === 1 ? '' : 's'}</span></div>
     <div class="cal-grid">${cells}</div><div class="legend">${legend}</div></section>`;
 }
@@ -57,7 +57,7 @@ function milesChart() {
   });
   s += '</svg>';
   return `<section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="row between"><h2>Weekly miles</h2><span class="muted">This week so far: ${fmt(data[data.length - 1].mi, 1)}</span></div>${s}
-    <div class="legend"><span><i style="background:#2F5BD8"></i>Miles run</span><span><i style="background:none;border-top:2px dashed #14213D;border-radius:0;height:0;width:14px"></i>Plan goal</span></div></section>`;
+    <div class="legend"><span><i style="background:#2F5BD8"></i>Miles run</span><span><i style="background:none;border-top:2px dashed var(--ink);border-radius:0;height:0;width:14px"></i>Plan goal</span></div></section>`;
 }
 
 function fitTogether() {
@@ -102,7 +102,7 @@ function fitTogether() {
   const cap = [diff != null ? (diff >= 0 ? `You've averaged about ${fmt(diff)} calories a day under your target, which counts your workouts.` : `You've averaged about ${fmt(-diff)} calories a day over your target.`) : '',
     tw != null ? `Your weight trend is ${tw < 0 ? `down ${fmt(-tw, 1)} lb` : tw > 0 ? `up ${fmt(tw, 1)} lb` : 'steady'} over this period.` : ''].filter(Boolean).join(' ');
   return `<section class="card" style="display:flex;flex-direction:column;gap:10px"><h2>How it all fits together</h2><p class="note">${esc(cap)}</p>${s}
-    <div class="legend"><span><i style="background:#14213D;height:3px;width:14px;border-radius:0"></i>Weight trend</span><span><i style="background:#2F5BD8"></i>Eaten / day</span><span><i style="background:#E4572E"></i>Target / day (incl. workouts)</span></div></section>`;
+    <div class="legend"><span><i style="background:var(--navy);height:3px;width:14px;border-radius:0"></i>Weight trend</span><span><i style="background:#2F5BD8"></i>Eaten / day</span><span><i style="background:#E4572E"></i>Target / day (incl. workouts)</span></div></section>`;
 }
 
 function weightCard() {
@@ -116,7 +116,7 @@ function weightCard() {
   return `<section class="card" style="display:flex;flex-direction:column;gap:10px"><div class="row between"><h2>Weight</h2><button class="btn ghost small" data-act="weigh">${icon('plus', 14)}Log weight</button></div>
     ${last ? `<div class="row" style="gap:18px"><div><div class="eyebrow">Trend</div><div style="font-size:24px;font-weight:800">${fmt(last.trend, 1)} lb</div></div><div><div class="eyebrow">Last weigh-in</div><div style="font-size:15px;font-weight:700">${fmt(last.lb, 1)} lb · ${D.fmtShort(last.date)}</div></div></div>
       <p class="note">The trend smooths out day-to-day water changes, so weigh in whenever you like.</p>` : '<p class="note">No weigh-ins yet. Log one whenever you like; there is no schedule.</p>'}
-    ${est ? `<div class="callout" style="background:#E3F2EA;color:#14532D">Based on your own logs over ${est.days} days, your real maintenance is about <b>${fmt(est.baseEquivalent)} cal</b> before workouts (your base target is ${fmt(base)}). You're ${est.lbPerWeek < 0 ? `losing about ${fmt(-est.lbPerWeek, 2)} lb a week` : est.lbPerWeek > 0 ? `gaining about ${fmt(est.lbPerWeek, 2)} lb a week` : 'holding steady'}.</div>` : ''}</section>`;
+    ${est ? `<div class="callout" style="background:var(--green-t);color:#14532D">Based on your own logs over ${est.days} days, your real maintenance is about <b>${fmt(est.baseEquivalent)} cal</b> before workouts (your base target is ${fmt(base)}). You're ${est.lbPerWeek < 0 ? `losing about ${fmt(-est.lbPerWeek, 2)} lb a week` : est.lbPerWeek > 0 ? `gaining about ${fmt(est.lbPerWeek, 2)} lb a week` : 'holding steady'}.</div>` : ''}</section>`;
 }
 
 function strength() {
@@ -124,12 +124,12 @@ function strength() {
   const prs = store.prList(since).slice(0, 6);
   return `<section class="card" style="padding-bottom:6px"><div class="row between" style="padding-bottom:6px"><h2>Getting stronger</h2><span class="muted">Last ${WEEKS} weeks</span></div>
     ${prs.length ? prs.map((p) => `<div class="list-row"><div class="grow"><div class="name">${esc(p.name)}</div><div class="meta">Best set: ${p.best.secs ? `${p.best.secs} sec` : p.best.lb ? `${p.best.lb} lb × ${p.best.reps}` : `${p.best.reps} reps`} · ${D.fmtShort(p.best.date)}</div></div>
-      ${p.gainLb > 0 ? `<span class="pill" style="background:#E3F2EA;color:#1F7A52">+${fmt(p.gainLb, 1)} lb</span>` : ''}</div>`).join('') : '<p class="note" style="padding-bottom:10px">Finish a strength workout and your best sets show up here.</p>'}</section>`;
+      ${p.gainLb > 0 ? `<span class="pill" style="background:var(--green-t);color:var(--green-tx)">+${fmt(p.gainLb, 1)} lb</span>` : ''}</div>`).join('') : '<p class="note" style="padding-bottom:10px">Finish a strength workout and your best sets show up here.</p>'}</section>`;
 }
 
 function energyCard() {
   const pts = db.all('energy').filter((e) => e.date >= D.addDays(D.today(), -60));
-  if (pts.length < 6) return `<section class="card"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, '#8A5A00')}Energy pattern</div><p class="note" style="margin-top:6px">Tap your energy on Today for about a week and patterns show up here.</p></section>`;
+  if (pts.length < 6) return `<section class="card"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, 'var(--gold-tx)')}Energy pattern</div><p class="note" style="margin-top:6px">Tap your energy on Today for about a week and patterns show up here.</p></section>`;
   const t = store.targetsFor(D.today());
   const tests = [
     { label: `you ate ${t.protein} g+ protein`, f: (d) => store.dayFood(d).totals.p >= t.protein },
@@ -145,8 +145,8 @@ function energyCard() {
     if (!best || Math.abs(a - b) > Math.abs(best.a - best.b)) best = { ...tt, a, b };
   }
   const avg = pts.reduce((s, p) => s + p.value, 0) / pts.length;
-  return `<section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, '#8A5A00')}Energy pattern</div>
-    ${best && Math.abs(best.a - best.b) >= 0.3 ? `<p style="font-size:15px;line-height:1.45;font-weight:700">Your energy averaged <span style="color:#1F7A52">${fmt(best.a, 1)}</span> on days ${esc(best.label)}, and ${fmt(best.b, 1)} on other days.</p>`
+  return `<section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, 'var(--gold-tx)')}Energy pattern</div>
+    ${best && Math.abs(best.a - best.b) >= 0.3 ? `<p style="font-size:15px;line-height:1.45;font-weight:700">Your energy averaged <span style="color:var(--green-tx)">${fmt(best.a, 1)}</span> on days ${esc(best.label)}, and ${fmt(best.b, 1)} on other days.</p>`
       : `<p style="font-size:15px;line-height:1.45;font-weight:700">Your energy has averaged ${fmt(avg, 1)} out of 5. No clear pattern yet.</p>`}
     <div class="muted small">Based on ${pts.length} check-ins. Patterns, not proof.</div></section>`;
 }
@@ -157,7 +157,7 @@ function drinksCard() {
   const mx = Math.max(1, ...vals);
   const cur = vals[vals.length - 1]; const prior = vals.slice(0, -1).filter((_, i) => weeks[i] >= D.weekStart(store.settings().createdOn));
   const avgPrior = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : null;
-  const bars = vals.map((v, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1"><div style="height:64px;display:flex;align-items:flex-end"><div style="width:18px;height:${Math.max(2, (v / mx) * 64)}px;border-radius:5px;background:${v ? '#6D4FC2' : '#E3E6EB'}"></div></div><span style="font-size:10px;font-weight:700;color:#5B6475">${D.parse(weeks[i]).getMonth() + 1}/${D.parse(weeks[i]).getDate()}</span></div>`).join('');
+  const bars = vals.map((v, i) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1"><div style="height:64px;display:flex;align-items:flex-end"><div style="width:18px;height:${Math.max(2, (v / mx) * 64)}px;border-radius:5px;background:${v ? 'var(--purple)' : 'var(--track)'}"></div></div><span style="font-size:10px;font-weight:700;color:var(--grey)">${D.parse(weeks[i]).getMonth() + 1}/${D.parse(weeks[i]).getDate()}</span></div>`).join('');
   return `<section class="card row" style="gap:14px"><div class="grow"><div class="eyebrow">Drinks per week</div><div style="font-size:22px;font-weight:800;margin-top:4px">${fmt(cur, 1)} <span class="muted">this week</span></div>
     ${avgPrior != null ? `<div class="muted">${cur < avgPrior ? `Down from about ${fmt(avgPrior, 1)} a week` : cur > avgPrior ? `Up from about ${fmt(avgPrior, 1)} a week` : 'Same as your recent average'}</div>` : '<div class="muted">Standard drinks</div>'}</div>
     <div style="display:flex;gap:4px;width:170px">${bars}</div></section>`;
@@ -171,6 +171,7 @@ export default {
       <div class="grid3"><div class="card" style="text-align:center;padding:12px 6px"><div style="font-size:24px;font-weight:800">${streak}</div><div class="muted small">day streak</div></div>
         <div class="card" style="text-align:center;padding:12px 6px"><div style="font-size:24px;font-weight:800">${best}</div><div class="muted small">best streak</div></div>
         <div class="card" style="text-align:center;padding:12px 6px"><div style="font-size:24px;font-weight:800">${wop}</div><div class="muted small">weeks on plan</div></div></div>
+      <a class="recap-card" href="#/recap/${D.weekStart(D.today()) > D.weekStart(store.settings()?.createdOn || D.today()) ? D.addDays(D.weekStart(D.today()), -7) : D.weekStart(D.today())}"><div class="grow"><small>WEEKLY RECAP</small><b>Your week in review</b><span class="s">Flip back through any week</span></div>${icon('chev', 20, '#fff')}</a>
       ${calendar()}${milesChart()}${fitTogether()}${weightCard()}${strength()}${energyCard()}${drinksCard()}</main>`;
   },
   actions: {

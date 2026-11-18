@@ -22,7 +22,7 @@ export const ADD_OPTIONS = [
   { key: 'full-body', group: 'Lift', title: 'Strength: full body', sub: '40 min with dumbbells', color: '#C94420' },
   { key: 'bodyweight', group: 'Lift', title: 'Bodyweight: arms, legs + core', sub: '30 min, no equipment', color: '#6D4FC2' },
   { key: 'hip-mobility', group: 'Lift', title: 'Hip mobility', sub: '15 min, 6 moves', color: '#1F7A52' },
-  { key: 'custom', group: 'Lift', title: 'Build your own lift', sub: 'Pick the exercises yourself', color: '#14213D' },
+  { key: 'custom', group: 'Lift', title: 'Build your own lift', sub: 'Pick the exercises yourself', color: '#6B7385' },
 ];
 
 export function makeItem(key, { miles = 3 } = {}) {
@@ -37,8 +37,8 @@ export function makeItem(key, { miles = 3 } = {}) {
 /** Sheet: add a workout to a day. */
 export function openAddWorkout(date) {
   const st = { step: 'pick', miles: 3 };
-  const opt = (o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="addPick" data-k="${o.key}">
-    <span class="type-dot" style="background:${o.color}22"><i style="background:${o.color}"></i></span><span class="grow"><span class="name" style="display:block">${esc(o.title)}</span><span class="meta">${esc(o.sub)}</span></span>${icon('plus', 18, '#6B7385')}</button>`;
+  const opt = (o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="addPick" data-k="${o.key}">
+    <span class="type-dot" style="background:${o.color}22"><i style="background:${o.color}"></i></span><span class="grow"><span class="name" style="display:block">${esc(o.title)}</span><span class="meta">${esc(o.sub)}</span></span>${icon('plus', 18, 'var(--grey-2)')}</button>`;
   openSheet({
     label: 'Add a workout',
     render: () => st.step === 'miles'
@@ -81,9 +81,9 @@ export function openExtraOptions(ref) {
     label: 'Change workout',
     render: () => `<div class="sheet-hd"><h2>${esc(s.item.title)}</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
       ${days.length ? `<div class="group-hd" style="padding-top:0">Move to</div><div class="grid4">${days.map((d) => `<button class="mini-btn" style="height:48px;flex-direction:column;gap:0" data-act="mvTo" data-d="${d}"><b>${D.DOW[D.dowIndex(d)]}</b><small>${D.parse(d).getDate()}</small></button>`).join('')}</div>` : ''}
-      <div class="group-hd">Swap for</div><div class="card" style="padding:4px 16px">${ADD_OPTIONS.filter((o) => o.key !== 'custom' && o.title !== s.item.title).map((o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="swapTo" data-k="${o.key}">
-        <span class="type-dot" style="background:${o.color}22"><i style="background:${o.color}"></i></span><span class="grow"><span class="name" style="display:block">${esc(o.title)}</span><span class="meta">${esc(o.key === 'easy' ? '3 mi easy' : o.sub)}</span></span>${icon('chev', 16, '#6B7385')}</button>`).join('')}</div>
-      <button class="btn danger block" data-act="rm">${icon('trash', 15, '#B3261E')}Remove from ${D.DOW_LONG[D.dowIndex(s.date)]}</button>`,
+      <div class="group-hd">Swap for</div><div class="card" style="padding:4px 16px">${ADD_OPTIONS.filter((o) => o.key !== 'custom' && o.title !== s.item.title).map((o) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="swapTo" data-k="${o.key}">
+        <span class="type-dot" style="background:${o.color}22"><i style="background:${o.color}"></i></span><span class="grow"><span class="name" style="display:block">${esc(o.title)}</span><span class="meta">${esc(o.key === 'easy' ? '3 mi easy' : o.sub)}</span></span>${icon('chev', 16, 'var(--grey-2)')}</button>`).join('')}</div>
+      <button class="btn danger block" data-act="rm">${icon('trash', 15, 'var(--red-tx)')}Remove from ${D.DOW_LONG[D.dowIndex(s.date)]}</button>`,
     actions: {
       close: () => closeSheet(),
       mvTo: async (el) => { await store.changeExtra(ref, { toDate: el.dataset.d }); closeSheet(true); toast(`Moved to ${D.DOW_LONG[D.dowIndex(el.dataset.d)]}`); refresh(); },
@@ -105,7 +105,7 @@ function sessionCard(s, d) {
   let status = '';
   if (s.workout) {
     const w = s.workout;
-    status = `<div class="callout row between" style="margin:0"><span>${icon('check', 15, '#1F7A52', 2.6)} Done · ${esc([w.distanceMi ? `${w.distanceMi} mi` : '', `${fmt(w.minutes)} min`, `${fmt(C.creditedKcal(w))} cal`].filter(Boolean).join(' · '))}</span><button class="btn small ghost" data-act="editW" data-id="${w.id}">Edit</button></div>`;
+    status = `<div class="callout row between" style="margin:0"><span>${icon('check', 15, 'var(--green-tx)', 2.6)} Done · ${esc([w.distanceMi ? `${w.distanceMi} mi` : '', `${fmt(w.minutes)} min`, `${fmt(C.creditedKcal(w))} cal`].filter(Boolean).join(' · '))}</span><button class="btn small ghost" data-act="editW" data-id="${w.id}">Edit</button></div>`;
   } else if (s.state === 'skipped') status = '<div class="muted small">Skipped</div>';
   else if (s.state === 'missed') status = '<div class="muted small">Missed</div>';
   const btns = [];

@@ -74,7 +74,7 @@ export default {
           : '<p class="note" style="padding:4px 0 10px">Add everything that goes in. Oil, cheese and sauces count; spices and herbs can be skipped.</p>'}
         <button class="btn ghost block" data-act="addIng" style="margin:6px 0 8px">${icon('plus', 16)}Add ingredient</button></section>
       <section class="card"><label class="field"><span>Steps (one per line, optional)</span><textarea id="re-steps" class="input" style="height:140px;padding:10px 12px;line-height:1.45" placeholder="Brown the chicken…&#10;Add the sauce…">${esc(d.stepsText)}</textarea></label></section>
-      ${isMine ? `<button class="btn danger block" data-act="del">${icon('trash', 15, '#B3261E')}Delete recipe</button>` : ''}
+      ${isMine ? `<button class="btn danger block" data-act="del">${icon('trash', 15, 'var(--red-tx)')}Delete recipe</button>` : ''}
       <div class="bottom-cta"><div><button class="btn block" data-act="save">${isMine ? 'Save changes' : 'Save recipe'}</button></div></div>
     </main>`;
   },
@@ -117,7 +117,7 @@ const fmtAmount = (g) => (g >= 28 ? `${fmt(C.gToOz(g), 1)} oz` : `${fmt(g)} g`);
 /** Pick a food for a recipe (built-in, hers, or online), then its amount. */
 export function openIngredientSheet({ onDone }) {
   const st = { q: '', online: { query: '', state: 'idle', results: [], error: '' } };
-  const rowFor = (f) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="pickFood" data-id="${esc(f.id)}">
+  const rowFor = (f) => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="pickFood" data-id="${esc(f.id)}">
     <span class="grow"><span class="name" style="display:block">${esc(f.name)}</span><span class="meta">${f.custom ? 'Your food · ' : f.source ? `${f.source} · ` : ''}${fmt(f.per100.kcal)} cal and ${fmt(f.per100.p)} g protein per 100 g</span></span>${icon('plus', 16)}</button>`;
   const results = () => {
     const q = st.q.trim();
@@ -136,7 +136,7 @@ export function openIngredientSheet({ onDone }) {
   openSheet({
     label: 'Add ingredient',
     render: () => `<div class="sheet-hd"><h2>Add ingredient</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
-      <label class="search">${icon('search', 18, '#5B6475')}<input id="ing-q" type="search" aria-label="Search foods" placeholder="Search foods" value="${esc(st.q)}" data-input="ingQ" autocomplete="off"></label>
+      <label class="search">${icon('search', 18, 'var(--grey)')}<input id="ing-q" type="search" aria-label="Search foods" placeholder="Search foods" value="${esc(st.q)}" data-input="ingQ" autocomplete="off"></label>
       <div id="ing-results">${results()}</div>`,
     actions: {
       close: () => closeSheet(),

@@ -21,8 +21,8 @@ function meta(e) {
 }
 function row(e, inList) {
   const already = inList.has(e.id);
-  return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="pickEx" data-id="${e.id}">
-    <span class="grow"><span class="name" style="display:block">${esc(e.name)}</span><span class="meta">${esc(meta(e))}${already ? ' · already in this workout' : ''}</span></span>${icon('plus', 18, '#C94420', 2.2)}</button>`;
+  return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="pickEx" data-id="${e.id}">
+    <span class="grow"><span class="name" style="display:block">${esc(e.name)}</span><span class="meta">${esc(meta(e))}${already ? ' · already in this workout' : ''}</span></span>${icon('plus', 18, 'var(--coral-tx)', 2.2)}</button>`;
 }
 function listHtml(q, inList, prefer) {
   const all = store.allExercises();
@@ -58,7 +58,7 @@ export function openExercisePicker({ title = 'Add an exercise', inList = [], rep
           <label class="field"><span>Exercise name</span><input id="nx-name" class="input" value="${esc(st.name)}" placeholder="e.g. Cable row, Box jump"></label>
           <div class="field"><span>How you track it</span><div class="seg" style="flex-wrap:wrap">${MODES.map(([k, l]) => `<button class="${st.mode === k ? 'on' : ''}" data-act="nxMode" data-k="${k}">${l}</button>`).join('')}</div></div>
           <div class="row"><button class="btn line grow" data-act="nxCancel">Cancel</button><button class="btn grow" data-act="nxSave">Add exercise</button></div></div>`
-      : `<label class="search">${icon('search', 18, '#5B6475')}<input id="ex-q" type="search" aria-label="Search exercises" placeholder="Search: squat, arms, core…" value="${esc(st.q)}" data-input="exSearch" autocomplete="off"></label>
+      : `<label class="search">${icon('search', 18, 'var(--grey)')}<input id="ex-q" type="search" aria-label="Search exercises" placeholder="Search: squat, arms, core…" value="${esc(st.q)}" data-input="exSearch" autocomplete="off"></label>
         <div id="ex-results">${listHtml(st.q, have, prefer)}</div>
         <button class="btn ghost block" data-act="nxStart">${icon('plus', 15)}Add your own exercise</button>`}`,
     actions: {

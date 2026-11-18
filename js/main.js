@@ -16,6 +16,7 @@ import onboarding from './views/onboarding.js';
 import day from './views/day.js';
 import lift from './views/lift.js';
 import recipeedit from './views/recipeedit.js';
+import recap from './views/recap.js';
 import { openQuickLog } from './views/quicklog.js';
 import * as fx from './celebrate.js';
 import * as rewards from './rewards.js';
@@ -25,6 +26,7 @@ const ROUTES = [
   [/^#\/train(?:\/(\w+))?$/, train],
   [/^#\/workout$/, workout],
   [/^#\/change\/(\d{4}-\d{2}-\d{2})$/, change],
+  [/^#\/recap(?:\/(\d{4}-\d{2}-\d{2}))?$/, recap],
   [/^#\/recipe-edit\/([\w-]+)$/, recipeedit],
   [/^#\/day\/(\d{4}-\d{2}-\d{2})$/, day],
   [/^#\/lift\/([pcm]:[\w-]+)$/, lift],
@@ -53,6 +55,42 @@ function tabbar(active) {
     ${t('eat', 'Eat', 'bowl', '#/eat')}${t('progress', 'Progress', 'chart', '#/progress')}</div></nav>`;
 }
 
+// ---------------- phone-like screen changes ----------------
+// Deeper screens slide in from the right, Back slides them away, tabs fade. Uses the browser's
+// View Transitions (Safari 18+); anything older just switches instantly.
+const navStack = [location.hash || '#/today'];
+const scrollMem = {};
+function navKind(hash, prevView, view) {
+  const prev = navStack[navStack.length - 1];
+  if (hash === prev) return 'none';
+  if (navStack.length > 1 && hash === navStack[navStack.length - 2]) { scrollMem[prev] = 0; navStack.pop(); return 'pop'; }
+  if (view === prevView && !view.tab) { navStack[navStack.length - 1] = hash; return 'sub'; }
+  if (view.tab && prevView.tab) { navStack.length = 0; navStack.push(hash); return view === prevView ? 'sub' : 'tab'; }
+  if (view.tab) { navStack.length = 0; navStack.push(hash); return 'pop'; }
+  scrollMem[prev] = window.scrollY; navStack.push(hash); return 'push';
+}
+function withTransition(kind, fn) {
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (kind === 'none' || reduce || !document.startViewTransition || document.visibilityState !== 'visible') { fn(); return; }
+  document.documentElement.dataset.nav = kind;
+  try {
+    const t = document.startViewTransition(fn);
+    // a quick second tap skips the first animation: that's fine, not an error
+    t.ready.catch(() => {}); t.updateCallbackDone.catch(() => {});
+    t.finished.catch(() => {}).finally(() => { if (document.documentElement.dataset.nav === kind) delete document.documentElement.dataset.nav; });
+  } catch { delete document.documentElement.dataset.nav; fn(); }
+}
+function navigate() {
+  const hash = location.hash || '#/today';
+  const prevView = current.view;
+  const { view } = match(hash);
+  const kind = navKind(hash, prevView, view);
+  withTransition(kind, () => {
+    render();
+    if (kind === 'pop' && scrollMem[hash] != null) window.scrollTo(0, scrollMem[hash]);
+  });
+}
+
 export function render({ keepScroll = false } = {}) {
   if (!store.onboarded() && !location.hash.startsWith('#/welcome')) { location.replace('#/welcome'); return; }
   const { view, params } = match(location.hash || '#/today');
@@ -75,7 +113,7 @@ const globalActions = {
 
 delegate(document.body, () => ({ ...globalActions, ...(current.view.actions || {}) }));
 
-window.addEventListener('hashchange', () => { if (sheetOpen()) closeSheet(true); render(); });
+window.addEventListener('hashchange', () => { if (sheetOpen()) closeSheet(true, true); navigate(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { store.clearCaches(); refresh(); sync.syncSoon(); } });
 
 async function boot() {

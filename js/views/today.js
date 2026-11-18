@@ -1,3 +1,4 @@
+import * as db from '../db.js';
 import * as store from '../store.js';
 import * as D from '../dates.js';
 import { tipFor, songFor, songLinks } from '../data/daily.js';
@@ -7,6 +8,17 @@ import { icon, esc, fmt, ringsSvg, toast } from '../ui.js';
 import { refresh, go } from '../main.js';
 import { openRunSheet, startTemplate, openEditWorkout } from './quicklog.js';
 import { startRef } from './day.js';
+
+/** Monday to Wednesday: "Your week is ready" until she opens it. */
+function recapCard(date) {
+  if (date !== D.today() || D.dowIndex(date) > 2) return '';
+  const wk = D.addDays(D.weekStart(date), -7);
+  if (db.meta(`recapSeen:${wk}`)) return '';
+  const end = D.addDays(wk, 6);
+  const had = db.all('workouts').some((w) => w.date >= wk && w.date <= end) || db.all('foodLog').some((e) => e.date >= wk && e.date <= end);
+  if (!had) return '';
+  return `<a class="recap-card" href="#/recap/${wk}"><div class="grow"><small>YOUR WEEK IS READY</small><b>See how last week went</b><span class="s">Workouts, wins, rings and what's next</span></div>${icon('chev', 20, '#fff')}</a>`;
+}
 
 function extraRows(p, date) {
   if (!p.extras?.length) return '';
@@ -49,7 +61,7 @@ function mealRows(date) {
   const byMeal = {};
   for (const e of list) (byMeal[e.meal] ||= []).push(e);
   const rows = [];
-  const tint = { breakfast: ['#FCEFD3', '#8A5A00'], lunch: ['#E3F2EA', '#1F7A52'], dinner: ['#FBE3DC', '#C94420'], snack: ['#DCE4FA', '#2F5BD8'], drinks: ['#EEE9FA', '#6D4FC2'] };
+  const tint = { breakfast: ['var(--gold-t)', 'var(--gold-tx)'], lunch: ['var(--green-t)', 'var(--green-tx)'], dinner: ['var(--coral-t)', 'var(--coral-tx)'], snack: ['var(--blue-t)', 'var(--blue-tx)'], drinks: ['var(--purple-t)', 'var(--purple-tx)'] };
   for (const m of store.MEALS) {
     const items = byMeal[m.id];
     if (!items) continue;
@@ -61,11 +73,11 @@ function mealRows(date) {
   const planned = store.plannedDinner(date);
   if (planned && !byMeal.dinner) {
     const r = RECIPE_BY_ID[planned];
-    rows.push(`<div class="list-row"><span class="icon-tile" style="border:1.5px dashed #B9C0CC">${icon('bowl', 18, '#5B6475')}</span>
+    rows.push(`<div class="list-row"><span class="icon-tile" style="border:1.5px dashed var(--input-line)">${icon('bowl', 18, 'var(--grey)')}</span>
       <span class="grow"><span class="meta" style="display:block">Dinner · planned</span><span class="name ellip" style="display:block">${esc(r?.name || '')}</span></span>
       <button class="btn ghost small" data-act="logPlanned" data-id="${planned}">Log it</button></div>`);
   }
-  if (!rows.length) rows.push(`<a class="list-row" href="#/add/breakfast"><span class="icon-tile" style="border:1.5px dashed #B9C0CC">${icon('plus', 18, '#5B6475')}</span><span class="grow name">Log your first meal</span></a>`);
+  if (!rows.length) rows.push(`<a class="list-row" href="#/add/breakfast"><span class="icon-tile" style="border:1.5px dashed var(--input-line)">${icon('plus', 18, 'var(--grey)')}</span><span class="grow name">Log your first meal</span></a>`);
   return rows.join('');
 }
 
@@ -93,8 +105,9 @@ export default {
     const cups = Math.round(t.waterOz / 8);
     return `<main class="screen">
       <div class="hdr"><div><div class="sub">${D.fmtLong(date)}</div><h1>${D.greeting()}${store.settings()?.name ? ', ' + esc(store.settings().name) : ''}</h1></div>
-        <a class="pill" href="#/progress" style="background:#fff;box-shadow:0 1px 2px rgba(20,33,61,.08);padding:8px 12px" aria-label="${streak} day streak">${icon('flame', 15, '#C94420', 2.2)}${streak ? `${streak}-day streak` : 'Start a streak'}</a></div>
+        <a class="pill" href="#/progress" style="background:var(--card);box-shadow:0 1px 2px rgba(20,33,61,.08);padding:8px 12px" aria-label="${streak} day streak">${icon('flame', 15, 'var(--coral-tx)', 2.2)}${streak ? `${streak}-day streak` : 'Start a streak'}</a></div>
 
+      ${recapCard(date)}
       <section class="card navy coach"><div class="eyebrow">Today's practice</div><p>${esc(store.coachNote(date))}</p>${workoutCard(p, date)}</section>
 
       <section class="card row" style="gap:16px;align-items:center">${rings}
@@ -119,12 +132,12 @@ export default {
         <div class="row between muted small" style="margin-top:6px"><span>Running on empty</span><span>Full tank</span></div></section>
 
       <div class="grid2">
-        <section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, '#8A5A00')}Tip</div><p style="font-size:14px;line-height:1.4;font-weight:600">${esc(tipFor(date))}</p></section>
-        <section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('music', 16, '#6D4FC2')}Hype song</div>
+        <section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('bulb', 16, 'var(--gold-tx)')}Tip</div><p style="font-size:14px;line-height:1.4;font-weight:600">${esc(tipFor(date))}</p></section>
+        <section class="card" style="display:flex;flex-direction:column;gap:8px"><div class="eyebrow" style="display:flex;gap:6px;align-items:center">${icon('music', 16, 'var(--purple-tx)')}Hype song</div>
           <div><div style="font-size:15px;font-weight:800">${esc(song.title)}</div><div class="muted small">${esc(song.artist)} · ${song.bpm} BPM</div></div>
-          <div class="row" style="gap:6px;flex-wrap:wrap"><a class="pill" style="background:#EEE9FA;color:#6D4FC2" href="${links.apple}" target="_blank" rel="noopener">${icon('play', 11, '#6D4FC2')}Apple Music</a><a class="pill" style="background:#E3F2EA;color:#1F7A52" href="${links.spotify}" target="_blank" rel="noopener">Spotify</a></div></section>
+          <div class="row" style="gap:6px;flex-wrap:wrap"><a class="pill" style="background:var(--purple-t);color:var(--purple-tx)" href="${links.apple}" target="_blank" rel="noopener">${icon('play', 11, 'var(--purple-tx)')}Apple Music</a><a class="pill" style="background:var(--green-t);color:var(--green-tx)" href="${links.spotify}" target="_blank" rel="noopener">Spotify</a></div></section>
       </div>
-      <a class="link-btn" href="#/settings" style="align-self:center;color:#5B6475">${icon('gear', 15, '#5B6475')}Settings & goals</a>
+      <a class="link-btn" href="#/settings" style="align-self:center;color:var(--grey)">${icon('gear', 15, 'var(--grey)')}Settings & goals</a>
     </main>`;
   },
   actions: {

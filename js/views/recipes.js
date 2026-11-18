@@ -6,7 +6,7 @@ import { FOOD_BY_ID } from '../data/foods.js';
 import { icon, esc, fmt, toast, openSheet, closeSheet, refreshSheet } from '../ui.js';
 import { refresh } from '../main.js';
 
-export const RECIPE_TINTS = { breakfast: ['#FCEFD3', '#8A5A00'], dinner: ['#FBE3DC', '#C94420'], lunch: ['#E3F2EA', '#1F7A52'], smoothie: ['#EEE9FA', '#6D4FC2'], snack: ['#DCE4FA', '#2F5BD8'] };
+export const RECIPE_TINTS = { breakfast: ['var(--gold-t)', 'var(--gold-tx)'], dinner: ['var(--coral-t)', 'var(--coral-tx)'], lunch: ['var(--green-t)', 'var(--green-tx)'], smoothie: ['var(--purple-t)', 'var(--purple-tx)'], snack: ['var(--blue-t)', 'var(--blue-tx)'] };
 
 export function openRecipeLogSheet(id, { meal, date = D.today() } = {}) {
   const r = RECIPE_BY_ID[id];
@@ -43,8 +43,8 @@ export function openPlanDaySheet(id) {
       const mp = store.mealPlan(st.week);
       return `<div class="sheet-hd"><h2>Plan ${esc(r.name)}</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
         <div class="seg"><button class="${st.week === wk ? 'on' : ''}" data-act="wk" data-w="${wk}">This week</button><button class="${st.week !== wk ? 'on' : ''}" data-act="wk" data-w="${D.addDays(wk, 7)}">Next week</button></div>
-        <div class="card" style="padding:4px 16px">${days.map((d) => { const cur = mp.days[d]; return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="day" data-d="${d}" ${d < D.today() ? 'disabled' : ''}>
-          <span style="width:44px;font-weight:800">${D.DOW[D.dowIndex(d)]} ${D.parse(d).getDate()}</span><span class="grow meta">${cur ? esc(RECIPE_BY_ID[cur]?.name) : 'Open'}</span>${cur === id ? icon('check', 16, '#1F7A52', 2.6) : icon('plus', 16, '#14213D')}</button>`; }).join('')}</div>
+        <div class="card" style="padding:4px 16px">${days.map((d) => { const cur = mp.days[d]; return `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="day" data-d="${d}" ${d < D.today() ? 'disabled' : ''}>
+          <span style="width:44px;font-weight:800">${D.DOW[D.dowIndex(d)]} ${D.parse(d).getDate()}</span><span class="grow meta">${cur ? esc(RECIPE_BY_ID[cur]?.name) : 'Open'}</span>${cur === id ? icon('check', 16, 'var(--green-tx)', 2.6) : icon('plus', 16, 'var(--ink)')}</button>`; }).join('')}</div>
         <p class="note">Recipes make ${r.servings} serving${r.servings > 1 ? 's' : ''}, so leftovers can cover lunch.</p>`;
     },
     actions: {
@@ -66,7 +66,7 @@ export default {
       <div class="row"><a class="round-btn" href="#/eat/recipes" aria-label="Back to recipes">${icon('back', 20)}</a><span class="muted">${r.meal === 'snack' ? (r.mine ? 'Snack' : 'Prep-ahead snack') : r.meal[0].toUpperCase() + r.meal.slice(1)}</span></div>
       <section class="card flush"><div role="img" aria-label="${esc(r.name)}" style="height:120px;background:${bg};display:flex;align-items:center;justify-content:center">${icon('bowl', 40, fg, 1.8)}</div>
         <div style="padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px"><h1 style="font-size:22px;font-weight:800;letter-spacing:-0.01em">${esc(r.name)}</h1>
-        <div class="chips">${r.minutes ? `<span class="pill">${r.minutes} min</span>` : ''}<span class="pill">Makes ${r.servings}</span>${r.tags.includes('crock-pot') ? '<span class="pill">Crock pot</span>' : ''}${r.mine ? '<span class="pill" style="background:#EEE9FA;color:#6D4FC2">Your recipe</span>' : ''}${r.addedSugar ? '' : '<span class="pill" style="background:#E3F2EA;color:#1F7A52">No added sugar</span>'}</div>
+        <div class="chips">${r.minutes ? `<span class="pill">${r.minutes} min</span>` : ''}<span class="pill">Makes ${r.servings}</span>${r.tags.includes('crock-pot') ? '<span class="pill">Crock pot</span>' : ''}${r.mine ? '<span class="pill" style="background:var(--purple-t);color:var(--purple-tx)">Your recipe</span>' : ''}${r.addedSugar ? '' : '<span class="pill" style="background:var(--green-t);color:var(--green-tx)">No added sugar</span>'}</div>
         <div class="grid4"><div class="stat-tile"><b>${s.kcal}</b><small>CAL</small></div><div class="stat-tile"><b>${s.p} g</b><small>PROTEIN</small></div><div class="stat-tile"><b>${s.fib} g</b><small>FIBER</small></div><div class="stat-tile"><b>${s.f} g</b><small>FAT</small></div></div>
         <div class="muted small">Per serving, calculated from ${r.mine ? 'the nutrition of each ingredient you added' : 'USDA values for each ingredient'}.</div></div></section>
       <div class="row"><button class="btn grow" data-act="log">${icon('plus', 15, '#fff')}Log a serving</button><button class="btn ghost grow" data-act="plan">${icon('calendar', 15)}Add to plan</button></div>

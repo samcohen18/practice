@@ -3,7 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F4F5F7">
+  <meta name="theme-color" content="#F4F5F7" id="theme-color">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    // Pick light or dark before the first paint (no white flash at night).
+    (function () {
+      var pref = 'auto'; try { pref = localStorage.getItem('practice.theme') || 'auto'; } catch (e) {}
+      var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', dark);
+      document.getElementById('theme-color').setAttribute('content', dark ? '#0C1322' : '#F4F5F7');
+    })();
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">

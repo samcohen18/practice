@@ -22,7 +22,7 @@ function readRow(e, i) {
   const ex = EX_BY_ID[e.exId];
   if (!ex) return '';
   const last = store.lastTime(e.exId);
-  const tag = ex.hip === 'friendly' ? '<span style="color:#1F7A52"> · hip-friendly</span>' : ex.hip === 'caution' ? '<span style="color:#C94420"> · careful with hips</span>' : '';
+  const tag = ex.hip === 'friendly' ? '<span style="color:var(--green-tx)"> · hip-friendly</span>' : ex.hip === 'caution' ? '<span style="color:var(--coral-tx)"> · careful with hips</span>' : '';
   return `<div class="ex-row"><span class="ex-num">${i + 1}</span><div class="grow">
     <div style="font-size:15px;font-weight:700">${esc(ex.name)}</div>
     <div class="muted small">${e.sets} × ${e.target} ${unitFor(ex)}${last ? ` · last time ${setTxt(ex, last.sets[0])}` : ''}${tag}</div></div></div>`;
@@ -42,7 +42,7 @@ function editRow(e, i, n) {
       <button class="mini-btn" data-act="mv" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} up">${icon('up', 16)}</button>
       <button class="mini-btn" data-act="mv" data-i="${i}" data-d="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Move ${esc(ex.name)} down">${icon('down', 16)}</button>
       <button class="mini-btn" data-act="swapEx" data-i="${i}">${icon('swap', 14)}Swap</button>
-      <button class="mini-btn danger" data-act="rmEx" data-i="${i}" aria-label="Remove ${esc(ex.name)}">${icon('trash', 14, '#B3261E')}Remove</button>
+      <button class="mini-btn danger" data-act="rmEx" data-i="${i}" aria-label="Remove ${esc(ex.name)}">${icon('trash', 14, 'var(--red-tx)')}Remove</button>
     </div></div>`;
 }
 
@@ -77,7 +77,7 @@ export default {
     }
 
     const warm = tmpl?.warmup?.length ? `<section class="card"><div class="eyebrow">Warm-up · 5 min</div><div class="muted" style="margin-top:6px">${tmpl.warmup.map((w) => esc(EX_BY_ID[w]?.name)).join(' · ')}</div></section>` : '';
-    const doneNote = s.workout ? `<div class="callout row between"><span>${icon('check', 15, '#1F7A52', 2.6)} Done${s.workout.title !== it.title ? `: ${esc(s.workout.title)}` : ''}</span></div>` : '';
+    const doneNote = s.workout ? `<div class="callout row between"><span>${icon('check', 15, 'var(--green-tx)', 2.6)} Done${s.workout.title !== it.title ? `: ${esc(s.workout.title)}` : ''}</span></div>` : '';
     const versionNote = dayCustom ? `<div class="callout row between"><span>You changed this one for ${D.DOW_LONG[D.dowIndex(s.date)]} only.</span><button class="btn small ghost" data-act="resetDay">Undo</button></div>`
       : mine ? `<div class="callout row between"><span>Your version of this workout.</span><button class="btn small ghost" data-act="resetMine">Coach's version</button></div>` : '';
     let cta = '';
@@ -150,8 +150,8 @@ export default {
       openSheet({
         label: 'Save changes',
         render: () => `<div class="sheet-hd"><h2>Save changes</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
-          <button class="card row" style="border:1.5px solid #CDD2DA;text-align:left;box-shadow:none" data-act="justThis"><span class="grow"><b style="display:block;font-size:15px">Just ${esc(day)}</b><span class="muted">Other days keep the usual moves</span></span>${icon('chev', 18, '#6B7385')}</button>
-          <button class="card row" style="border:1.5px solid #CDD2DA;text-align:left;box-shadow:none" data-act="every"><span class="grow"><b style="display:block;font-size:15px">Every time</b><span class="muted">Use this version whenever "${esc(tmpl.title)}" comes up</span></span>${icon('chev', 18, '#6B7385')}</button>`,
+          <button class="card row" style="border:1.5px solid var(--input-line);text-align:left;box-shadow:none" data-act="justThis"><span class="grow"><b style="display:block;font-size:15px">Just ${esc(day)}</b><span class="muted">Other days keep the usual moves</span></span>${icon('chev', 18, 'var(--grey-2)')}</button>
+          <button class="card row" style="border:1.5px solid var(--input-line);text-align:left;box-shadow:none" data-act="every"><span class="grow"><b style="display:block;font-size:15px">Every time</b><span class="muted">Use this version whenever "${esc(tmpl.title)}" comes up</span></span>${icon('chev', 18, 'var(--grey-2)')}</button>`,
         actions: { close: () => closeSheet(), justThis: () => finish(false), every: () => finish(true) },
       });
     },

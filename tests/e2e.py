@@ -23,8 +23,8 @@ def toast_text(pg):
     t = pg.locator(".toast")
     return t.inner_text() if t.count() else ""
 
-def new_page(browser, errors):
-    ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True, accept_downloads=True)
+def new_page(browser, errors, **kw):
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True, accept_downloads=True, **kw)
     pg = ctx.new_page()
     pg.add_init_script("try{ if(!sessionStorage.getItem('fxTest')) localStorage.setItem('practice.celebrations','off') }catch(e){}")
     pg.on("console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None)
@@ -637,7 +637,7 @@ with sync_playwright() as p:
     other = js(pg, f"window.__practice.D.range(window.__practice.D.weekStart('{fday}'),7).find(d=>d>='{today}' && d!=='{fday}')")
     if other:
         clk(f"button[data-act='extraOpts'][data-ref='{ex3[-1]['ref']}']"); clk(f".sheet button[data-act='mvTo'][data-d='{other}']")
-        check("add workout: move it to another day", any(x["item"]["templateId"] == "bodyweight" for x in js(pg, f"window.__practice.store.planFor('{other}').extras")))
+        check("add workout: move it to another day", any(x["item"].get("templateId") == "bodyweight" for x in js(pg, f"window.__practice.store.planFor('{other}').extras")))
 
     # build your own lift today, then do it (clear today's earlier test workouts so it starts fresh)
     js(pg, f"(async()=>{{for (const w of window.__practice.store.workoutsFor('{today}')) await window.__practice.db.remove('workouts', w.id);}})()")
@@ -703,7 +703,7 @@ with sync_playwright() as p:
     pg.wait_for_selector("text=Weekly miles")
     body = pg.inner_text("main")
     check("progress: streak stats", "day streak" in body and "best streak" in body and "weeks on plan" in body)
-    check("progress: calendar colored days", pg.locator(".cal-grid .d[style*='background:#2F5BD8']").count() >= 3)
+    check("progress: calendar colored days", pg.locator(".cal-grid .d[style*='background:var(--blue-tx)']").count() >= 3)
     check("progress: miles chart labels", "Miles run" in body and "Plan goal" in body)
     check("progress: fits-together caption", "calories a day" in body and "weight trend" in body.lower())
     check("progress: weight trend value", "trend" in body.lower() and " lb" in body)
@@ -796,6 +796,92 @@ with sync_playwright() as p:
     st3 = js(pg3, "window.__practice.store.settings()")
     check("new phone sign-in: backed-up settings win over the welcome screens", st3["name"] == "Jessie" and st3["baseKcal"] == 1700 and st3["createdOn"] == "2026-10-01", f"{st3.get('name')} {st3.get('baseKcal')}")
     ctx3.close()
+
+    # ---------------- 11a. Weekly recap, screen transitions, dark mode ----------------
+    ctx5, pg5 = new_page(browser, errors)
+    pg5.goto(BASE); pg5.wait_for_selector("#o-name")
+    js(pg5, """(async()=>{const P=window.__practice, db=P.db, S=P.store, D=P.D;
+ await S.completeOnboarding({name:'Jess',age:24,weightLb:150,heightIn:66,lifestyle:'desk',baseKcal:1700});
+ const st=S.settings(); const created=D.addDays(D.weekStart(D.today()),-14);
+ await db.put('settings',{...st, createdOn: created, plan:{...st.plan, start: created}});
+ S.clearCaches();
+ const lw=D.addDays(D.weekStart(D.today()),-7), pw=D.addDays(lw,-7);
+ const lift=(date,lb)=>S.saveWorkout({date,type:'strength',title:'Strength: lower body + hips',minutes:45,templateId:'lower-hips',endedAt:date+'T18:00:00Z',exercises:[{exId:'goblet-squat',sets:[{lb,reps:10,done:true},{lb,reps:10,done:true},{lb,reps:10,done:true}]},{exId:'db-rdl',sets:[{lb:lb+5,reps:10,done:true},{lb:lb+5,reps:10,done:true}]}]});
+ await lift(D.addDays(pw,1),25); await S.saveWorkout({date:D.addDays(pw,0),type:'run',title:'Easy run',distanceMi:3,minutes:33}); await S.saveWorkout({date:D.addDays(pw,5),type:'run',title:'Long run',distanceMi:5,minutes:56});
+ for (const [i,mi,min] of [[0,3,32],[2,4,41],[5,6,65.2]]) await S.saveWorkout({date:D.addDays(lw,i),type:'run',title:i===5?'Long run':'Easy run',distanceMi:mi,minutes:min});
+ await lift(D.addDays(lw,1),30); await lift(D.addDays(lw,3),30);
+ await S.saveWorkout({date:D.addDays(lw,6),type:'mobility',title:'Hip mobility',minutes:15});
+ for (let i=0;i<7;i++){ const d=D.addDays(lw,i); await S.logFood({date:d,meal:'breakfast',foodId:'greek-yogurt',g:250}); await S.logFood({date:d,meal:'lunch',recipeId:'greek-salad-chicken',servings:1}); await S.logFood({date:d,meal:'dinner',recipeId:i%2?'thai-basil-chicken':'turkey-bolognese',servings:1.3}); await S.addWater(d,72);}
+ await S.logFood({date:D.today(),meal:'breakfast',foodId:'greek-yogurt',g:200});
+})()""")
+    pg5.goto(BASE + "#/today"); pg5.wait_for_selector("text=Today's practice")
+    lw = js(pg5, "window.__practice.D.addDays(window.__practice.D.weekStart(window.__practice.D.today()),-7)")
+    if js(pg5, "window.__practice.D.dowIndex(window.__practice.D.today())") <= 2:
+        check("recap: 'Your week is ready' card on Today early in the week", pg5.locator(".recap-card").count() == 1)
+    pg5.goto(BASE + "#/recap"); pg5.wait_for_selector(".rc-hero")
+    body = pg5.inner_text("main")
+    check("recap: headline finds the good part", "You got stronger this week" in body, body[:200])
+    check("recap: what you did", all(x in body for x in ["13 mi", "4 h 03 m", "3,200 lb", "workouts"]))
+    check("recap: compares with her own last week", "▲ 5 mi" in body and "▲ 1 h 49 m" in body)
+    check("recap: new bests listed", "New best: Goblet squat 30 lb × 10" in body and "Up from 25 lb × 10" in body)
+    check("recap: long run with pace", "Long run: 6 mi at 10:52 /mi" in body)
+    check("recap: 7 day rings", pg5.locator(".rc-rings > div").count() == 7)
+    check("recap: fuel averages", "avg 128 g" in body and "avg 72 oz" in body)
+    check("recap: next week from the plan", "COACH" in body and "mi planned" in body)
+    check("recap: no weight anywhere", "weight" not in body.lower() and " lb ·" not in body)
+    check("recap: no share button", "share" not in body.lower())
+    shot(pg5, "40_recap")
+    clk_p = lambda sel: (pg5.click(sel), pg5.wait_for_timeout(250))
+    clk_p("button[data-act='wk'][data-d='-7']")
+    check("recap: previous week", "Nov" in pg5.inner_text("main") and "#/recap/" in pg5.url and pg5.locator(".rc-hero").count() == 1)
+    check("recap: can't go before her first week", pg5.locator("button[data-act='wk'][data-d='-7']").is_disabled())
+    clk_p("button[data-act='wk'][data-d='7']"); clk_p("button[data-act='wk'][data-d='7']")
+    check("recap: this week so far", "THIS WEEK SO FAR" in pg5.inner_text("main") and pg5.locator("button[data-act='wk'][data-d='7']").is_disabled())
+    pg5.goto(BASE + "#/today"); pg5.wait_for_selector("text=Today's practice")
+    check("recap: card goes away once opened", pg5.locator(".recap-card").count() == 0)
+    pg5.goto(BASE + "#/progress"); pg5.wait_for_selector(".recap-card")
+    check("recap: always reachable from Progress", "Your week in review" in pg5.inner_text("main"))
+
+    # transitions: push / pop / tab, recorded as they happen
+    pg5.goto(BASE + "#/today"); pg5.wait_for_selector("text=Today's practice"); pg5.wait_for_timeout(300)
+    js(pg5, "window.__navs=[]; new MutationObserver(()=>{const n=document.documentElement.dataset.nav; if(n) window.__navs.push(n)}).observe(document.documentElement,{attributes:true,attributeFilter:['data-nav']})")
+    check("transitions: browser supports view transitions", js(pg5, "typeof document.startViewTransition === 'function'"))
+    pg5.click("a[href^='#/lift/']"); pg5.wait_for_timeout(600)
+    pg5.go_back(); pg5.wait_for_timeout(600)
+    pg5.click(".tab[href='#/train']"); pg5.wait_for_timeout(600)
+    pg5.click(".tab[href='#/eat']"); pg5.wait_for_timeout(400)
+    pg5.click("button[data-act='tab'][data-tab='recipes']") if pg5.locator("button[data-act='tab'][data-tab='recipes']").count() else None
+    navs = js(pg5, "window.__navs")
+    check("transitions: deeper screen slides in, back slides out, tabs fade", navs[:4] == ["push", "pop", "tab", "tab"], str(navs))
+    check("transitions: finished cleanly", js(pg5, "document.documentElement.dataset.nav") is None)
+    check("transitions: tab bar stays put", js(pg5, "getComputedStyle(document.querySelector('.tabbar')).viewTransitionName") == "tabbar")
+    pg5.click(".fab"); pg5.wait_for_timeout(450)
+    pg5.click(".sheet button[data-act='close']"); pg5.wait_for_timeout(60)
+    check("sheet: slides away instead of vanishing", pg5.locator(".sheet-wrap.closing").count() == 1 and pg5.locator(".sheet").count() == 0)
+    pg5.wait_for_timeout(250)
+    check("sheet: gone after closing", pg5.locator(".sheet-wrap").count() == 0)
+
+    # dark mode
+    check("dark mode: light by default on a light phone", js(pg5, "document.documentElement.classList.contains('dark')") is False)
+    pg5.goto(BASE + "#/settings"); pg5.wait_for_selector("text=Appearance")
+    pg5.click("button[data-act='theme'][data-k='dark']"); pg5.wait_for_timeout(200)
+    check("dark mode: switch on in Settings", js(pg5, "document.documentElement.classList.contains('dark')") and js(pg5, "getComputedStyle(document.body).backgroundColor") == "rgb(12, 19, 34)")
+    check("dark mode: status bar color follows", js(pg5, "document.getElementById('theme-color').content") == "#0C1322")
+    pg5.reload(); pg5.wait_for_selector("text=Appearance")
+    check("dark mode: remembered after reopening, no flash", js(pg5, "document.documentElement.classList.contains('dark')"))
+    for route in ["#/today", "#/recap", "#/train", "#/eat/recipes", "#/progress"]:
+        pg5.goto(BASE + route); pg5.wait_for_timeout(300)
+        bad = js(pg5, """(()=>{const lum=(c)=>{const m=c.match(/\\d+(\\.\\d+)?/g); if(!m) return 1; const [r,g,b]=m.map(Number); return (0.2126*r+0.7152*g+0.0722*b)/255}; const out=[];
+          for (const el of document.querySelectorAll('main .card, main .rc-stat, main .list-row, main .search, main .input')) { const bg=getComputedStyle(el).backgroundColor; if (bg && !bg.includes('rgba(0, 0, 0, 0)') && lum(bg) > 0.7) out.push(el.className) } return out.slice(0,5)})()""")
+        check(f"dark mode: no bright white panels on {route}", not bad, str(bad))
+        shot(pg5, "41_dark_" + route.strip("#/").replace("/", "_"))
+    pg5.goto(BASE + "#/settings"); pg5.click("button[data-act='theme'][data-k='light']"); pg5.wait_for_timeout(150)
+    check("dark mode: light forced", js(pg5, "document.documentElement.classList.contains('dark')") is False)
+    ctx5.close()
+    ctx6, pg6 = new_page(browser, errors, color_scheme="dark")
+    onboard(pg6, "Night"); finish_onboarding(pg6)
+    check("dark mode: Automatic follows a dark phone", js(pg6, "document.documentElement.classList.contains('dark')"))
+    ctx6.close()
 
     # ---------------- 11b. Celebrations ----------------
     ctx4, pg4 = new_page(browser, errors)

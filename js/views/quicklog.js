@@ -15,7 +15,7 @@ export function openQuickLog() {
   const t = D.today();
   const tile = (act, ic, color, label, sub) => `<button class="card row" style="border:none;text-align:left" data-act="${act}">
     <span class="icon-tile" style="background:${color}22;width:42px;height:42px">${icon(ic, 22, color)}</span>
-    <span class="grow"><b style="display:block;font-size:15px">${label}</b><span class="muted">${sub}</span></span>${icon('chev', 18, '#6B7385')}</button>`;
+    <span class="grow"><b style="display:block;font-size:15px">${label}</b><span class="muted">${sub}</span></span>${icon('chev', 18, 'var(--grey-2)')}</button>`;
   openSheet({
     label: 'Log something',
     render: () => `<div class="sheet-hd"><h2>Log something</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
@@ -23,8 +23,8 @@ export function openQuickLog() {
       ${tile('workout', 'dumbbell', '#C94420', 'Workout', 'Run, strength, bodyweight or mobility')}
       ${tile('drink', 'glass', '#6D4FC2', 'Drink', 'Wine, beer, cocktails')}
       <div class="grid2">
-        <button class="card" style="border:none;text-align:left" data-act="water"><span style="display:flex;gap:8px;align-items:center;font-weight:800">${icon('drop', 20, '#2F5BD8')}+ 8 oz water</span><span class="muted">${fmt(store.waterFor(t))} oz today</span></button>
-        <button class="card" style="border:none;text-align:left" data-act="weight"><span style="display:flex;gap:8px;align-items:center;font-weight:800">${icon('scale', 20, '#1F7A52')}Weight</span><span class="muted">Whenever you like</span></button>
+        <button class="card" style="border:none;text-align:left" data-act="water"><span style="display:flex;gap:8px;align-items:center;font-weight:800">${icon('drop', 20, 'var(--blue-tx)')}+ 8 oz water</span><span class="muted">${fmt(store.waterFor(t))} oz today</span></button>
+        <button class="card" style="border:none;text-align:left" data-act="weight"><span style="display:flex;gap:8px;align-items:center;font-weight:800">${icon('scale', 20, 'var(--green-tx)')}Weight</span><span class="muted">Whenever you like</span></button>
       </div>`,
     actions: {
       close: () => closeSheet(),
@@ -38,8 +38,8 @@ export function openQuickLog() {
 }
 
 export function openWorkoutPicker(date, origDate) {
-  const opt = (act, color, title, sub, arg = '') => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid #E6E8EC;text-align:left" data-act="${act}" data-arg="${arg}">
-    <span class="type-dot" style="background:${color}22"><i style="background:${color}"></i></span><span class="grow"><span class="name" style="display:block">${title}</span><span class="meta">${sub}</span></span>${icon('chev', 18, '#6B7385')}</button>`;
+  const opt = (act, color, title, sub, arg = '') => `<button class="list-row" style="width:100%;background:none;border:none;border-top:1px solid var(--line);text-align:left" data-act="${act}" data-arg="${arg}">
+    <span class="type-dot" style="background:${color}22"><i style="background:${color}"></i></span><span class="grow"><span class="name" style="display:block">${title}</span><span class="meta">${sub}</span></span>${icon('chev', 18, 'var(--grey-2)')}</button>`;
   openSheet({
     label: 'Log a workout',
     render: () => `<div class="sheet-hd"><h2>Log a workout</h2><button class="round-btn" data-act="close" aria-label="Close">${icon('close', 18)}</button></div>
